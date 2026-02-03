@@ -1,0 +1,5 @@
+/* Tailwind CSS is now used throughout the application */
+.App {
+  @apply min-h-screen bg-dark-bg-primary;
+}
+

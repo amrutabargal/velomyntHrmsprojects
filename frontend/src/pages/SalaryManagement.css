@@ -1,0 +1,98 @@
+.salary-management {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.salaries-table-container {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.salaries-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.salaries-table thead {
+  background-color: var(--bg-tertiary);
+}
+
+.salaries-table th {
+  padding: 1rem;
+  text-align: left;
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+.salaries-table td {
+  padding: 1rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.salaries-table tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+.status-badge.approved {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+.status-badge.paid {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: var(--accent-primary);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.generate-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.generate-btn:hover {
+  background-color: var(--accent-secondary);
+}
+
+.download-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--success);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.download-btn:hover {
+  background-color: #059669;
+}
+
