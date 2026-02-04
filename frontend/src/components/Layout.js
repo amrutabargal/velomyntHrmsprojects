@@ -31,9 +31,11 @@ const Layout = ({ children }) => {
   if (user?.role === 'admin') {
     menuItems.push({ path: '/employees', label: 'Employees', icon: '👥' });
     menuItems.push({ path: '/pending-approvals', label: 'Pending Approvals', icon: '⏳' });
-  } else if (user?.role === 'hr' || user?.role === 'subadmin') {
+  } else if (user?.role === 'subadmin') {
     menuItems.push({ path: '/employees', label: 'Employees', icon: '👥' });
     menuItems.push({ path: '/pending-approvals', label: 'Pending Approvals', icon: '⏳' });
+  } else if (user?.role === 'hr') {
+    menuItems.push({ path: '/employees', label: 'Employees', icon: '👥' });
   } else if (user?.role === 'manager') {
     menuItems.push({ path: '/employees', label: 'Team', icon: '👥' });
   }

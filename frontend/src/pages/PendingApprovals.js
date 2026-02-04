@@ -8,6 +8,7 @@ const PendingApprovals = () => {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [otpByUserId, setOtpByUserId] = useState({});
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -37,13 +38,45 @@ const PendingApprovals = () => {
         setTimeout(() => setMessage(''), 3000);
         return;
       }
-      
-      await axios.post(`${API_URL}/auth/approve/${userId}`);
+
+      const payload = {};
+      if (user?.role === 'admin') {
+        const otp = otpByUserId[userId];
+        if (!otp) {
+          setMessage('OTP is required for admin approval (check admin email)');
+          setTimeout(() => setMessage(''), 3000);
+          return;
+        }
+        payload.otp = otp;
+      }
+
+      await axios.post(`${API_URL}/auth/approve/${userId}`, payload);
       setMessage('User approved successfully!');
+      setOtpByUserId(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
       fetchPendingUsers();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Error approving user');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const handleResendOtp = async (userId) => {
+    try {
+      if (user?.role !== 'admin') {
+        setMessage('Only admin can resend OTP');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
+      await axios.post(`${API_URL}/auth/resend-admin-otp/${userId}`);
+      setMessage('OTP sent to admin email');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Error resending OTP');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -114,6 +147,9 @@ const PendingApprovals = () => {
                   {user?.role === 'admin' && (
                     <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Current Role</th>
                   )}
+                  {user?.role === 'admin' && (
+                    <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">OTP</th>
+                  )}
                   <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Actions</th>
                 </tr>
               </thead>
@@ -130,6 +166,18 @@ const PendingApprovals = () => {
                         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-500">
                           {pendingUser.role.toUpperCase()}
                         </span>
+                      </td>
+                    )}
+                    {user?.role === 'admin' && (
+                      <td className="p-4 border-b border-dark-border">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Enter OTP"
+                          value={otpByUserId[pendingUser._id] || ''}
+                          onChange={(e) => setOtpByUserId(prev => ({ ...prev, [pendingUser._id]: e.target.value.trim() }))}
+                          className="px-3 py-2 bg-dark-bg-tertiary text-dark-text-primary border border-dark-border rounded text-sm focus:outline-none focus:border-blue-500 w-40"
+                        />
                       </td>
                     )}
                     <td className="p-4 border-b border-dark-border">
@@ -151,6 +199,14 @@ const PendingApprovals = () => {
                         >
                           Approve
                         </button>
+                        {user?.role === 'admin' && (
+                          <button
+                            onClick={() => handleResendOtp(pendingUser._id)}
+                            className="px-4 py-1 bg-blue-500 text-white border-none rounded text-sm cursor-pointer font-medium transition-colors hover:bg-blue-600"
+                          >
+                            Resend OTP
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

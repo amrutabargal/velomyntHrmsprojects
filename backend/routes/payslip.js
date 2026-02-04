@@ -45,6 +45,11 @@ router.post('/generate/:salaryId', auth, authorize('admin', 'hr', 'subadmin'), a
 // @access  Private
 router.get('/download/:salaryId', auth, async (req, res) => {
   try {
+    const allowedRoles = ['admin', 'hr', 'subadmin', 'employee'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
     const salary = await Salary.findById(req.params.salaryId);
     if (!salary) {
       return res.status(404).json({ message: 'Salary record not found' });
@@ -80,6 +85,11 @@ router.get('/download/:salaryId', auth, async (req, res) => {
 // @access  Private
 router.get('/:salaryId', auth, async (req, res) => {
   try {
+    const allowedRoles = ['admin', 'hr', 'subadmin', 'employee'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
     const Salary = require('../models/Salary');
     const User = require('../models/User');
     

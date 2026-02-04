@@ -54,6 +54,15 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // OTP sent to admin email for approving this registration
+  admin_otp_hash: {
+    type: String,
+    default: null
+  },
+  admin_otp_expires_at: {
+    type: Date,
+    default: null
+  },
   department: {
     type: String,
     trim: true

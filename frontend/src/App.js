@@ -46,7 +46,7 @@ function App() {
             <Route
               path="/salary"
               element={
-                <PrivateRoute>
+                <PrivateRoute allowedRoles={['admin', 'hr', 'subadmin', 'employee']}>
                   <SalaryManagement />
                 </PrivateRoute>
               }
@@ -70,7 +70,7 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <PrivateRoute>
+                <PrivateRoute allowedRoles={['employee']}>
                   <Attendance />
                 </PrivateRoute>
               }

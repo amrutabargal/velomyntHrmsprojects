@@ -13,19 +13,30 @@ const createAdmin = async () => {
     // Check if admin already exists
     const existingAdmin = await User.findOne({ emp_id: 'ADMIN001' });
     if (existingAdmin) {
-      console.log('Admin user already exists!');
+      // Reset existing admin credentials so password is correct
+      existingAdmin.email = 'admin@hrms.com';
+      existingAdmin.name = existingAdmin.name || 'Admin User';
+      existingAdmin.role = 'admin';
+      existingAdmin.status = 'active';
+      existingAdmin.department = existingAdmin.department || 'Administration';
+      existingAdmin.designation = existingAdmin.designation || 'System Administrator';
+      // IMPORTANT: set plain password so User pre-save hook hashes it once
+      existingAdmin.password = 'admin123';
+      await existingAdmin.save();
+
+      console.log('Admin user already existed. Credentials have been reset.');
+      console.log('Email: admin@hrms.com');
+      console.log('Password: admin123');
+      console.log('Please change the password after first login!');
       process.exit(0);
     }
 
-    // Create admin user
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('admin123', salt);
-
+    // Create admin user (password will be hashed by User model pre-save hook)
     const admin = new User({
       emp_id: 'ADMIN001',
       name: 'Admin User',
       email: 'admin@hrms.com',
-      password: hashedPassword,
+      password: 'admin123',
       role: 'admin',
       status: 'active',
       department: 'Administration',

@@ -2,6 +2,10 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const COMPANY_CONFIG = require('../config/company');
+const { generateNumericOtp, hashOtp, verifyOtp } = require('../utils/adminOtp');
+const { sendMail } = require('../utils/mailer');
+const { adminRegistrationOtpEmail } = require('../utils/emailTemplates');
 const router = express.Router();
 
 // Generate JWT Token
@@ -10,6 +14,38 @@ const generateToken = (id) => {
     expiresIn: '30d',
   });
 };
+
+async function getAdminRecipientEmail() {
+  const admin = await User.findOne({ role: 'admin', status: 'active' }).select('email');
+  return (
+    admin?.email ||
+    process.env.ADMIN_EMAIL ||
+    COMPANY_CONFIG?.email ||
+    null
+  );
+}
+
+async function issueAndEmailAdminOtp({ pendingUser }) {
+  const otp = generateNumericOtp(6);
+  const otpHash = await hashOtp(otp);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  pendingUser.admin_otp_hash = otpHash;
+  pendingUser.admin_otp_expires_at = expiresAt;
+  await pendingUser.save();
+
+  const to = await getAdminRecipientEmail();
+  if (!to) {
+    const err = new Error('Admin email is not configured (set ADMIN_EMAIL or create an active admin user with an email)');
+    err.code = 'ADMIN_EMAIL_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const { subject, text, html } = adminRegistrationOtpEmail({ otp, newUser: pendingUser });
+  await sendMail({ to, subject, text, html });
+
+  return { otpSent: true, otpExpiresAt: expiresAt };
+}
 
 // @route   POST /api/auth/register
 // @desc    Register a new user (Admin/HR/Subadmin - for employee creation)
@@ -50,7 +86,7 @@ router.post('/register', auth, async (req, res) => {
     }
 
     // Create user with properly structured bank_details
-    // Admin creates active users, Subadmin/HR create pending employees (needs admin approval)
+    // Admin creates active users, others create pending users (needs approval)
     const userStatus = req.user.role === 'admin' ? 'active' : 'pending';
     const approvedBy = req.user.role === 'admin' ? req.user.id : null;
     const approvedAt = req.user.role === 'admin' ? new Date() : null;
@@ -75,12 +111,23 @@ router.post('/register', auth, async (req, res) => {
 
     await newUser.save();
 
+    let otpMeta = { otpSent: false };
+    if (newUser.status === 'pending') {
+      try {
+        otpMeta = await issueAndEmailAdminOtp({ pendingUser: newUser });
+      } catch (e) {
+        // Don't block registration if SMTP isn't configured; approval can still be done manually.
+        otpMeta = { otpSent: false, otpError: e.code || 'OTP_EMAIL_FAILED' };
+      }
+    }
+
     const statusMessage = userStatus === 'active' 
       ? 'User registered successfully' 
       : 'Employee registered successfully! Approval pending from admin.';
 
     res.status(201).json({
       message: statusMessage,
+      ...otpMeta,
       user: {
         id: newUser._id,
         emp_id: newUser.emp_id,
@@ -157,7 +204,7 @@ router.post('/login', async (req, res) => {
 // @access  Public
 router.post('/register-public', async (req, res) => {
   try {
-    const { emp_id, name, email, password, department, designation, bank_details } = req.body;
+    const { emp_id, name, email, password, role, department, designation, bank_details } = req.body;
 
     // Validate required fields
     if (!emp_id || !name || !email || !password) {
@@ -175,14 +222,22 @@ router.post('/register-public', async (req, res) => {
       return res.status(400).json({ message: 'User with this email or employee ID already exists' });
     }
 
-    // Create user as subadmin with pending status
+    // Public registration: allow roles including admin
+    const allowedPublicRoles = ['admin', 'subadmin', 'hr', 'employee', 'manager'];
+    const selectedRole = role && allowedPublicRoles.includes(role) ? role : 'subadmin';
+
+    // If no admin exists yet and user is registering as admin, auto-activate
+    const existingAdmin = await User.exists({ role: 'admin' });
+    const userStatus = !existingAdmin && selectedRole === 'admin' ? 'active' : 'pending';
+
+    // Create user
     const user = new User({
       emp_id: emp_id.trim(),
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: 'subadmin',
-      status: 'pending',
+      role: selectedRole,
+      status: userStatus,
       department: department ? department.trim() : '',
       designation: designation ? designation.trim() : '',
       bank_details: bank_details ? {
@@ -194,8 +249,24 @@ router.post('/register-public', async (req, res) => {
 
     await user.save();
 
+    let otpMeta = { otpSent: false };
+    // Only send OTP if user is pending (i.e. not the very first auto-activated admin)
+    if (user.status === 'pending') {
+      try {
+        otpMeta = await issueAndEmailAdminOtp({ pendingUser: user });
+      } catch (e) {
+        otpMeta = { otpSent: false, otpError: e.code || 'OTP_EMAIL_FAILED' };
+      }
+    }
+
+    const message =
+      user.status === 'active'
+        ? 'Registration successful! Admin account is active. You can login now.'
+        : 'Registration successful! Your account is pending approval from admin.';
+
     res.status(201).json({
-      message: 'Registration successful! Your account is pending approval from admin.',
+      message,
+      ...otpMeta,
       user: {
         id: user._id,
         emp_id: user.emp_id,
@@ -239,10 +310,31 @@ router.post('/approve/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Subadmin can only approve employee requests' });
     }
 
+    // Admin OTP validation (extra authentication for approval)
+    if (req.user.role === 'admin') {
+      const { otp } = req.body;
+      if (!otp) {
+        return res.status(400).json({ message: 'OTP is required for admin approval' });
+      }
+      if (!user.admin_otp_hash || !user.admin_otp_expires_at) {
+        return res.status(400).json({ message: 'OTP is not generated for this user (please resend OTP)' });
+      }
+      if (new Date() > new Date(user.admin_otp_expires_at)) {
+        return res.status(400).json({ message: 'OTP expired (please resend OTP)' });
+      }
+      const ok = await verifyOtp(otp, user.admin_otp_hash);
+      if (!ok) {
+        return res.status(400).json({ message: 'Invalid OTP' });
+      }
+    }
+
     // Update user status and approval info
     user.status = 'active';
     user.approved_by = req.user.id;
     user.approved_at = new Date();
+    // clear otp after approval
+    user.admin_otp_hash = null;
+    user.admin_otp_expires_at = null;
 
     await user.save();
 
@@ -259,6 +351,31 @@ router.post('/approve/:id', auth, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Error approving user' });
+  }
+});
+
+// @route   POST /api/auth/resend-admin-otp/:id
+// @desc    Resend admin OTP for a pending user (Admin only)
+// @access  Private (Admin)
+router.post('/resend-admin-otp/:id', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admin can resend OTP' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.status !== 'pending') {
+      return res.status(400).json({ message: 'OTP can be resent only for pending users' });
+    }
+
+    const meta = await issueAndEmailAdminOtp({ pendingUser: user });
+    res.json({ message: 'OTP sent to admin email', ...meta });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Error resending OTP' });
   }
 });
 

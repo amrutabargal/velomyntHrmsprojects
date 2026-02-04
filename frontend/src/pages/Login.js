@@ -15,6 +15,7 @@ const Login = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'employee',
     department: '',
     designation: '',
     bank_details: {
@@ -96,6 +97,7 @@ const Login = () => {
         name: registerData.name,
         email: registerData.email,
         password: registerData.password,
+        role: registerData.role,
         department: registerData.department,
         designation: registerData.designation,
         bank_details: {
@@ -195,6 +197,21 @@ const Login = () => {
                   placeholder="john@example.com"
                   className="p-3 border border-dark-border rounded-lg bg-dark-bg-tertiary text-dark-text-primary text-base focus:outline-none focus:border-blue-500"
                 />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-dark-text-primary font-medium text-sm">Role *</label>
+                <select
+                  name="role"
+                  value={registerData.role}
+                  onChange={handleRegisterChange}
+                  className="p-3 border border-dark-border rounded-lg bg-dark-bg-tertiary text-dark-text-primary text-base focus:outline-none focus:border-blue-500"
+                >
+                  <option value="employee">Employee</option>
+                  <option value="hr">HR</option>
+                  <option value="subadmin">Sub Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-dark-text-primary font-medium text-sm">Department</label>
@@ -299,6 +316,8 @@ const Login = () => {
                     email: '',
                     password: '',
                     confirmPassword: '',
+        role: 'employee',
+                    role: 'employee',
                     department: '',
                     designation: '',
                     bank_details: {

@@ -100,6 +100,11 @@ router.post('/', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) =>
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
+    const allowedRoles = ['admin', 'hr', 'subadmin', 'employee'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
     let query = {};
     
     // Employees can only see their own salary records
