@@ -222,13 +222,12 @@ router.post('/register-public', async (req, res) => {
       return res.status(400).json({ message: 'User with this email or employee ID already exists' });
     }
 
-    // Public registration: allow roles including admin
-    const allowedPublicRoles = ['admin', 'subadmin', 'hr', 'employee', 'manager'];
-    const selectedRole = role && allowedPublicRoles.includes(role) ? role : 'subadmin';
+    // Public registration: safe roles only (admin NOT allowed - must be created by existing admin)
+    const allowedPublicRoles = ['subadmin', 'hr', 'employee', 'manager'];
+    const selectedRole = role && allowedPublicRoles.includes(role) ? role : 'employee';
 
-    // If no admin exists yet and user is registering as admin, auto-activate
-    const existingAdmin = await User.exists({ role: 'admin' });
-    const userStatus = !existingAdmin && selectedRole === 'admin' ? 'active' : 'pending';
+    // All public registrations start as pending (requires admin approval)
+    const userStatus = 'pending';
 
     // Create user
     const user = new User({
@@ -259,10 +258,7 @@ router.post('/register-public', async (req, res) => {
       }
     }
 
-    const message =
-      user.status === 'active'
-        ? 'Registration successful! Admin account is active. You can login now.'
-        : 'Registration successful! Your account is pending approval from admin.';
+    const message = 'Registration successful! Your account is pending approval from admin.';
 
     res.status(201).json({
       message,
@@ -310,25 +306,7 @@ router.post('/approve/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Subadmin can only approve employee requests' });
     }
 
-    // Admin OTP validation (extra authentication for approval)
-    if (req.user.role === 'admin') {
-      const { otp } = req.body;
-      if (!otp) {
-        return res.status(400).json({ message: 'OTP is required for admin approval' });
-      }
-      if (!user.admin_otp_hash || !user.admin_otp_expires_at) {
-        return res.status(400).json({ message: 'OTP is not generated for this user (please resend OTP)' });
-      }
-      if (new Date() > new Date(user.admin_otp_expires_at)) {
-        return res.status(400).json({ message: 'OTP expired (please resend OTP)' });
-      }
-      const ok = await verifyOtp(otp, user.admin_otp_hash);
-      if (!ok) {
-        return res.status(400).json({ message: 'Invalid OTP' });
-      }
-    }
-
-    // Update user status and approval info
+    // Update user status and approval info (OTP removed for simplicity)
     user.status = 'active';
     user.approved_by = req.user.id;
     user.approved_at = new Date();
@@ -434,7 +412,21 @@ router.get('/me', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    // Return user with explicit id field for frontend compatibility
+    res.json({
+      id: user._id,
+      _id: user._id,
+      emp_id: user.emp_id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      department: user.department,
+      designation: user.designation,
+      bank_details: user.bank_details,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Error fetching user' });
   }

@@ -1,22 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import './PendingApprovals.css';
+
+// Material Icons
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import EmailIcon from '@mui/icons-material/Email';
+import BadgeIcon from '@mui/icons-material/Badge';
+import BusinessIcon from '@mui/icons-material/Business';
+import WorkIcon from '@mui/icons-material/Work';
 
 const PendingApprovals = () => {
   const { user } = useAuth();
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [otpByUserId, setOtpByUserId] = useState({});
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-  useEffect(() => {
-    fetchPendingUsers();
-  }, []);
-
-  const fetchPendingUsers = async () => {
+  const fetchPendingUsers = useCallback(async () => {
     try {
       const response = await axios.get(`${API_URL}/employees/pending`);
       setPendingUsers(response.data);
@@ -26,37 +29,24 @@ const PendingApprovals = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchPendingUsers();
+  }, [fetchPendingUsers]);
 
   const handleApprove = async (userId) => {
     try {
       const pendingUser = pendingUsers.find(u => u._id === userId);
       
-      // Subadmin can only approve employees
       if (user?.role === 'subadmin' && pendingUser?.role !== 'employee') {
         setMessage('Subadmin can only approve employee requests');
         setTimeout(() => setMessage(''), 3000);
         return;
       }
 
-      const payload = {};
-      if (user?.role === 'admin') {
-        const otp = otpByUserId[userId];
-        if (!otp) {
-          setMessage('OTP is required for admin approval (check admin email)');
-          setTimeout(() => setMessage(''), 3000);
-          return;
-        }
-        payload.otp = otp;
-      }
-
-      await axios.post(`${API_URL}/auth/approve/${userId}`, payload);
+      await axios.post(`${API_URL}/auth/approve/${userId}`, {});
       setMessage('User approved successfully!');
-      setOtpByUserId(prev => {
-        const next = { ...prev };
-        delete next[userId];
-        return next;
-      });
       fetchPendingUsers();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -65,25 +55,20 @@ const PendingApprovals = () => {
     }
   };
 
-  const handleResendOtp = async (userId) => {
+  const handleReject = async (userId) => {
     try {
-      if (user?.role !== 'admin') {
-        setMessage('Only admin can resend OTP');
-        setTimeout(() => setMessage(''), 3000);
-        return;
-      }
-      await axios.post(`${API_URL}/auth/resend-admin-otp/${userId}`);
-      setMessage('OTP sent to admin email');
+      await axios.delete(`${API_URL}/employees/${userId}`);
+      setMessage('User rejected and removed!');
+      fetchPendingUsers();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Error resending OTP');
+      setMessage(error.response?.data?.message || 'Error rejecting user');
       setTimeout(() => setMessage(''), 3000);
     }
   };
 
   const handleChangeRole = async (userId, newRole) => {
     try {
-      // Only admin can change roles
       if (user?.role !== 'admin') {
         setMessage('Only admin can change user roles');
         setTimeout(() => setMessage(''), 3000);
@@ -99,10 +84,22 @@ const PendingApprovals = () => {
     }
   };
 
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'hr': return 'bg-primary-100 text-primary-700';
+      case 'subadmin': return 'bg-purple-100 text-purple-700';
+      case 'manager': return 'bg-amber-100 text-amber-700';
+      default: return 'bg-emerald-100 text-emerald-700';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-dark-text-secondary">Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-text-secondary">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -110,8 +107,11 @@ const PendingApprovals = () => {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-dark-text-primary text-3xl font-bold">Pending Approvals</h1>
-        <p className="text-dark-text-secondary mt-2">
+        <h1 className="text-text-primary text-3xl font-bold flex items-center gap-3">
+          <PendingActionsIcon className="text-primary-600" fontSize="large" />
+          Pending Approvals
+        </h1>
+        <p className="text-text-secondary mt-2">
           {user?.role === 'admin' 
             ? 'Approve or manage pending user registrations' 
             : 'Approve pending employee registrations'}
@@ -119,101 +119,98 @@ const PendingApprovals = () => {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md mb-4 text-center ${
+        <div className={`p-4 rounded-xl mb-6 text-center flex items-center justify-center gap-2 ${
           message.includes('Error')
-            ? 'bg-red-500/10 border border-red-500 text-red-500'
-            : 'bg-green-500/10 border border-green-500 text-green-500'
+            ? 'bg-red-50 border border-red-200 text-red-700'
+            : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
         }`}>
+          <CheckCircleIcon />
           {message}
         </div>
       )}
 
       {pendingUsers.length === 0 ? (
-        <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-12 text-center">
-          <p className="text-dark-text-secondary text-lg">No pending approvals</p>
-          <p className="text-dark-text-secondary text-sm mt-2">All users have been approved</p>
+        <div className="bg-surface-primary border border-border-light rounded-2xl p-12 text-center shadow-card">
+          <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircleIcon className="text-primary-600" style={{ fontSize: 40 }} />
+          </div>
+          <p className="text-text-primary text-lg font-semibold">No pending approvals</p>
+          <p className="text-text-secondary text-sm mt-2">All users have been approved</p>
         </div>
       ) : (
-        <div className="bg-dark-bg-secondary border border-dark-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead className="bg-dark-bg-tertiary">
-                <tr>
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Employee ID</th>
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Name</th>
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Email</th>
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Department</th>
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Designation</th>
+        <div className="grid gap-4">
+          {pendingUsers.map((pendingUser) => (
+            <div key={pendingUser._id} className="bg-surface-primary border border-border-light rounded-2xl p-6 shadow-card hover:shadow-soft transition-all">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                {/* User Avatar & Info */}
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-xl font-bold text-primary-700">
+                      {pendingUser.name?.charAt(0)?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-text-primary font-semibold truncate">{pendingUser.name}</h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(pendingUser.role)}`}>
+                        {pendingUser.role.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                      <span className="flex items-center gap-1">
+                        <BadgeIcon fontSize="small" className="text-text-muted" />
+                        {pendingUser.emp_id}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <EmailIcon fontSize="small" className="text-text-muted" />
+                        {pendingUser.email}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary mt-1">
+                      <span className="flex items-center gap-1">
+                        <BusinessIcon fontSize="small" className="text-text-muted" />
+                        {pendingUser.department || 'N/A'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <WorkIcon fontSize="small" className="text-text-muted" />
+                        {pendingUser.designation || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-wrap items-center gap-3">
                   {user?.role === 'admin' && (
-                    <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Current Role</th>
+                    <select
+                      value={pendingUser.role}
+                      onChange={(e) => handleChangeRole(pendingUser._id, e.target.value)}
+                      className="px-4 py-2 bg-surface-tertiary text-text-primary border border-border-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="hr">HR</option>
+                      <option value="subadmin">Sub Admin</option>
+                      <option value="manager">Manager</option>
+                    </select>
                   )}
-                  {user?.role === 'admin' && (
-                    <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">OTP</th>
-                  )}
-                  <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingUsers.map((pendingUser) => (
-                  <tr key={pendingUser._id} className="hover:bg-dark-bg-tertiary transition-colors">
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">{pendingUser.emp_id}</td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">{pendingUser.name}</td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">{pendingUser.email}</td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">{pendingUser.department || 'N/A'}</td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">{pendingUser.designation || 'N/A'}</td>
-                    {user?.role === 'admin' && (
-                      <td className="p-4 border-b border-dark-border">
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-500">
-                          {pendingUser.role.toUpperCase()}
-                        </span>
-                      </td>
-                    )}
-                    {user?.role === 'admin' && (
-                      <td className="p-4 border-b border-dark-border">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="Enter OTP"
-                          value={otpByUserId[pendingUser._id] || ''}
-                          onChange={(e) => setOtpByUserId(prev => ({ ...prev, [pendingUser._id]: e.target.value.trim() }))}
-                          className="px-3 py-2 bg-dark-bg-tertiary text-dark-text-primary border border-dark-border rounded text-sm focus:outline-none focus:border-blue-500 w-40"
-                        />
-                      </td>
-                    )}
-                    <td className="p-4 border-b border-dark-border">
-                      <div className="flex flex-wrap gap-2">
-                        {user?.role === 'admin' && (
-                          <select
-                            value={pendingUser.role}
-                            onChange={(e) => handleChangeRole(pendingUser._id, e.target.value)}
-                            className="px-3 py-1 bg-dark-bg-tertiary text-dark-text-primary border border-dark-border rounded text-sm focus:outline-none focus:border-blue-500"
-                          >
-                            <option value="subadmin">Sub Admin</option>
-                            <option value="hr">HR</option>
-                            <option value="employee">Employee</option>
-                          </select>
-                        )}
-                        <button
-                          onClick={() => handleApprove(pendingUser._id)}
-                          className="px-4 py-1 bg-green-500 text-white border-none rounded text-sm cursor-pointer font-medium transition-colors hover:bg-green-600"
-                        >
-                          Approve
-                        </button>
-                        {user?.role === 'admin' && (
-                          <button
-                            onClick={() => handleResendOtp(pendingUser._id)}
-                            className="px-4 py-1 bg-blue-500 text-white border-none rounded text-sm cursor-pointer font-medium transition-colors hover:bg-blue-600"
-                          >
-                            Resend OTP
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <button
+                    onClick={() => handleApprove(pendingUser._id)}
+                    className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    <CheckCircleIcon fontSize="small" />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleReject(pendingUser._id)}
+                    className="px-5 py-2 bg-red-600 text-white rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-red-700 transition-colors shadow-sm"
+                  >
+                    <CancelIcon fontSize="small" />
+                    Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
