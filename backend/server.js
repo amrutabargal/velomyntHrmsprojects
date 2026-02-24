@@ -30,6 +30,7 @@ app.use('/api/timesheet', require('./routes/timesheet'));
 app.use('/api/leave', require('./routes/leave'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/time', require('./routes/time'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

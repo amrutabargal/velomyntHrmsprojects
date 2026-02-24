@@ -20,8 +20,8 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -36,6 +36,26 @@ const Layout = ({ children }) => {
   // Add Attendance for employees
   if (user?.role === 'employee') {
     menuItems.push({ path: '/attendance', label: 'Attendance', icon: <AccessTimeIcon /> });
+  }
+
+  // Time Tracker available for logged in users
+  if (user) {
+    menuItems.push({ path: '/time', label: 'Time Tracker', icon: <AccessTimeIcon /> });
+  }
+
+  // Leave available for employees and managers/admin/hr/subadmin
+  if (user) {
+    menuItems.push({ path: '/leave', label: 'Leave', icon: <PendingActionsIcon /> });
+  }
+
+  // Timesheet available for employees and approvers
+  if (user) {
+    menuItems.push({ path: '/timesheet', label: 'Timesheet', icon: <AccessTimeIcon /> });
+  }
+
+  // Calendar for all users
+  if (user) {
+    menuItems.push({ path: '/calendar', label: 'Calendar', icon: <AccessTimeIcon /> });
   }
 
   // Add management menus

@@ -182,6 +182,23 @@ router.post('/login', async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
+    // Start an automatic time session for this login (best-effort, idempotent)
+    try {
+      const TimeSession = require('../models/TimeSession');
+      const activeSession = await TimeSession.findOne({ user: user._id, endAt: null }).sort({ startAt: -1 });
+      if (!activeSession) {
+        await TimeSession.create({
+          user: user._id,
+          startAt: new Date(),
+          source: 'auto',
+          meta: { ip: req.ip, device: req.headers['user-agent'] }
+        });
+      }
+    } catch (e) {
+      // Non-fatal: continue login even if time session fails
+      console.warn('TimeSession start failed:', e.message);
+    }
+
     res.json({
       token,
       user: {
@@ -196,6 +213,26 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Error during login' });
+  }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Logout - stop active time session
+// @access  Private
+router.post('/logout', auth, async (req, res) => {
+  try {
+    const TimeSession = require('../models/TimeSession');
+    const now = new Date();
+    const activeSessions = await TimeSession.find({ user: req.user.id, endAt: null });
+    if (activeSessions.length) {
+      await TimeSession.updateMany(
+        { user: req.user.id, endAt: null },
+        { $set: { endAt: now } }
+      );
+    }
+    res.json({ message: 'Logged out - active sessions stopped' });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Error during logout' });
   }
 });
 

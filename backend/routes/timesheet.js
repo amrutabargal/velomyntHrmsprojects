@@ -143,8 +143,8 @@ router.post('/:id/submit', auth, async (req, res) => {
 
 // @route   POST /api/timesheet/:id/approve
 // @desc    Approve timesheet
-// @access  Private (Manager/HR/Admin)
-router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const timesheet = await Timesheet.findById(req.params.id)
       .populate('user');
@@ -192,8 +192,8 @@ router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (re
 
 // @route   POST /api/timesheet/:id/reject
 // @desc    Reject timesheet
-// @access  Private (Manager/HR/Admin)
-router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const { rejection_reason } = req.body;
 
@@ -284,8 +284,8 @@ router.get('/', auth, async (req, res) => {
 
 // @route   GET /api/timesheet/pending
 // @desc    Get pending timesheets for approval
-// @access  Private (Manager/HR/Admin)
-router.get('/pending', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.get('/pending', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     let query = { status: 'submitted' };
 

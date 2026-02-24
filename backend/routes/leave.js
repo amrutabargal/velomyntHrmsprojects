@@ -165,7 +165,7 @@ router.get('/balance', auth, async (req, res) => {
 // @route   GET /api/leave/pending
 // @desc    Get pending leave requests
 // @access  Private (Manager/HR/Admin)
-router.get('/pending', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+router.get('/pending', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     let query = { status: 'pending' };
 
@@ -185,10 +185,62 @@ router.get('/pending', auth, authorize('manager', 'hr', 'admin'), async (req, re
   }
 });
 
+// @route   GET /api/leave/dashboard
+// @desc    Get leave dashboard data (balance, recent leaves, pending counts)
+// @access  Private
+router.get('/dashboard', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    // Calculate used leaves (approved)
+    const usedLeaves = await Leave.aggregate([
+      { $match: { user: user._id, status: 'approved', leave_type: { $in: ['casual', 'sick', 'paid'] } } },
+      { $group: { _id: '$leave_type', total: { $sum: '$total_days' } } }
+    ]);
+
+    const balance = {
+      casual: (user.leave_balance?.casual || 12) - (usedLeaves.find(l => l._id === 'casual')?.total || 0),
+      sick: (user.leave_balance?.sick || 10) - (usedLeaves.find(l => l._id === 'sick')?.total || 0),
+      paid: (user.leave_balance?.paid || 15) - (usedLeaves.find(l => l._id === 'paid')?.total || 0)
+    };
+
+    // Recent leaves for employee or team (if manager)
+    let recentQuery = {};
+    if (req.user.role === 'employee') {
+      recentQuery.user = req.user.id;
+    } else if (req.user.role === 'manager') {
+      const teamMembers = await User.find({ manager: req.user.id }).select('_id');
+      recentQuery.user = { $in: teamMembers.map(u => u._id) };
+    }
+
+    const recentLeaves = await Leave.find(recentQuery)
+      .populate('user', 'name emp_id')
+      .sort({ applied_at: -1 })
+      .limit(10);
+
+    // Pending counts (for manager/hr/admin)
+    let pendingCount = 0;
+    if (req.user.role === 'manager') {
+      const teamMembers = await User.find({ manager: req.user.id }).select('_id');
+      pendingCount = await Leave.countDocuments({ user: { $in: teamMembers.map(u => u._id) }, status: 'pending' });
+    } else if (req.user.role === 'hr' || req.user.role === 'admin') {
+      pendingCount = await Leave.countDocuments({ status: 'pending' });
+    }
+
+    res.json({
+      balance,
+      recentLeaves,
+      pendingCount
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Error building dashboard' });
+  }
+});
+
 // @route   POST /api/leave/:id/approve
 // @desc    Approve leave request
 // @access  Private (Manager/HR/Admin)
-router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const leave = await Leave.findById(req.params.id)
       .populate('user');
@@ -253,7 +305,7 @@ router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (re
 // @route   POST /api/leave/:id/reject
 // @desc    Reject leave request
 // @access  Private (Manager/HR/Admin)
-router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const { rejection_reason } = req.body;
 
