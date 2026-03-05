@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
+
 const TRACKED_ROLES = ['employee', 'manager', 'hr', 'subadmin'];
 const HALF_DAY_HOURS = Number(process.env.ATTENDANCE_HALF_DAY_HOURS || 4.5);
 const LATE_AFTER_HOUR = Number(process.env.ATTENDANCE_LATE_AFTER_HOUR || 10);
