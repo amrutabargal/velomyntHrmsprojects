@@ -47,6 +47,27 @@ async function issueAndEmailAdminOtp({ pendingUser }) {
   return { otpSent: true, otpExpiresAt: expiresAt };
 }
 
+async function saveWithEmpIdRetry(userDoc, maxAttempts = 3) {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    try {
+      await userDoc.save();
+      return;
+    } catch (error) {
+      const isEmpIdConflict = error.code === 11000 && error.keyPattern?.emp_id;
+      if (!isEmpIdConflict) {
+        throw error;
+      }
+
+      // Clear ID so pre-validate can generate the next available sequence.
+      userDoc.emp_id = undefined;
+      attempt += 1;
+    }
+  }
+
+  throw new Error('Could not generate unique employee ID after multiple attempts');
+}
+
 // @route   POST /api/auth/register
 // @desc    Register a new user (Admin/HR/Subadmin - for employee creation)
 // @access  Private (Admin/HR/Subadmin)
@@ -57,11 +78,11 @@ router.post('/register', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to register users' });
     }
 
-    const { emp_id, name, email, password, role, department, designation, bank_details } = req.body;
+    const { name, email, password, role, department, designation, bank_details } = req.body;
 
     // Validate required fields
-    if (!emp_id || !name || !email || !password) {
-      return res.status(400).json({ message: 'Please provide all required fields (emp_id, name, email, password)' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Please provide all required fields (name, email, password)' });
     }
 
     // Validate password length
@@ -80,9 +101,9 @@ router.post('/register', auth, async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { emp_id }] });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'User with this email or employee ID already exists' });
+      return res.status(400).json({ message: 'User with this email already exists' });
     }
 
     // Create user with properly structured bank_details
@@ -92,7 +113,6 @@ router.post('/register', auth, async (req, res) => {
     const approvedAt = req.user.role === 'admin' ? new Date() : null;
     
     const newUser = new User({
-      emp_id: emp_id.trim(),
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
@@ -109,7 +129,7 @@ router.post('/register', auth, async (req, res) => {
       } : {}
     });
 
-    await newUser.save();
+    await saveWithEmpIdRetry(newUser);
 
     let otpMeta = { otpSent: false };
     if (newUser.status === 'pending') {
@@ -241,11 +261,11 @@ router.post('/logout', auth, async (req, res) => {
 // @access  Public
 router.post('/register-public', async (req, res) => {
   try {
-    const { emp_id, name, email, password, role, department, designation, bank_details } = req.body;
+    const { name, email, password, role, department, designation, bank_details } = req.body;
 
     // Validate required fields
-    if (!emp_id || !name || !email || !password) {
-      return res.status(400).json({ message: 'Please provide all required fields (emp_id, name, email, password)' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Please provide all required fields (name, email, password)' });
     }
 
     // Validate password length
@@ -254,9 +274,9 @@ router.post('/register-public', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { emp_id }] });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'User with this email or employee ID already exists' });
+      return res.status(400).json({ message: 'User with this email already exists' });
     }
 
     // Public registration: safe roles only (admin NOT allowed - must be created by existing admin)
@@ -268,7 +288,6 @@ router.post('/register-public', async (req, res) => {
 
     // Create user
     const user = new User({
-      emp_id: emp_id.trim(),
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
@@ -283,7 +302,7 @@ router.post('/register-public', async (req, res) => {
       } : {}
     });
 
-    await user.save();
+    await saveWithEmpIdRetry(user);
 
     let otpMeta = { otpSent: false };
     // Only send OTP if user is pending (i.e. not the very first auto-activated admin)

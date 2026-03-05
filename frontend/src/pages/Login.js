@@ -7,7 +7,6 @@ import axios from 'axios';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import PersonIcon from '@mui/icons-material/Person';
-import BadgeIcon from '@mui/icons-material/Badge';
 import BusinessIcon from '@mui/icons-material/Business';
 import WorkIcon from '@mui/icons-material/Work';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -22,7 +21,6 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [registerData, setRegisterData] = useState({
-    emp_id: '',
     name: '',
     email: '',
     password: '',
@@ -104,7 +102,6 @@ const Login = () => {
     setRegisterLoading(true);
     try {
       const dataToSend = {
-        emp_id: registerData.emp_id,
         name: registerData.name,
         email: registerData.email,
         password: registerData.password,
@@ -122,7 +119,6 @@ const Login = () => {
       setRegisterMessage(response.data.message || 'Registration successful! Please wait for admin approval.');
       
       setRegisterData({
-        emp_id: '',
         name: '',
         email: '',
         password: '',
@@ -174,22 +170,10 @@ const Login = () => {
           )}
 
           <form onSubmit={handleRegisterSubmit} className="space-y-5">
+            <p className="text-sm text-text-secondary">
+              Employee ID is auto-generated with VM series based on selected role.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Employee ID *</label>
-                <div className="relative">
-                  <BadgeIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input
-                    type="text"
-                    name="emp_id"
-                    value={registerData.emp_id}
-                    onChange={handleRegisterChange}
-                    required
-                    placeholder="EMP001"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
               <div>
                 <label className={labelClass}>Full Name *</label>
                 <div className="relative">

@@ -6,7 +6,7 @@ dotenv.config();
 
 const ADMIN_EMAIL = 'amruta442001@gmail.com';
 const ADMIN_PASSWORD = 'Amruta@2001';
-const ADMIN_EMP_ID = 'ADMIN001';
+const ADMIN_EMP_ID = 'VM001';
 
 const createAdmin = async () => {
   try {
@@ -16,7 +16,7 @@ const createAdmin = async () => {
     // Step 1: Find user by email (target email)
     const userByEmail = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
     
-    // Step 2: Find user by emp_id (ADMIN001)
+    // Step 2: Find user by admin emp_id (VM001)
     const userByEmpId = await User.findOne({ emp_id: ADMIN_EMP_ID });
 
     // Case 1: Same user has both - just update
@@ -36,10 +36,10 @@ const createAdmin = async () => {
 
     // Case 2: User exists with target email (but different emp_id) - update this user to be admin
     if (userByEmail) {
-      // Delete old ADMIN001 if exists (to avoid emp_id conflict)
+      // Delete old VM001 if exists (to avoid emp_id conflict)
       if (userByEmpId) {
         await User.deleteOne({ _id: userByEmpId._id });
-        console.log('Old ADMIN001 user removed.');
+        console.log('Old VM001 user removed.');
       }
       
       userByEmail.emp_id = ADMIN_EMP_ID;
@@ -56,7 +56,7 @@ const createAdmin = async () => {
       process.exit(0);
     }
 
-    // Case 3: ADMIN001 exists but with different email - update email
+    // Case 3: VM001 exists but with different email - update email
     if (userByEmpId) {
       userByEmpId.email = ADMIN_EMAIL.toLowerCase();
       userByEmpId.role = 'admin';

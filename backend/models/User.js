@@ -1,6 +1,43 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const EMP_ID_PREFIX_BY_ROLE = {
+  admin: 'VM',
+  subadmin: 'VMS',
+  hr: 'VMH',
+  manager: 'VMM',
+  employee: 'VME',
+};
+
+const getEmpIdPrefix = (role) => {
+  return EMP_ID_PREFIX_BY_ROLE[role] || EMP_ID_PREFIX_BY_ROLE.employee;
+};
+
+const escapeRegex = (value) => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+async function generateNextEmpId(model, role) {
+  const prefix = getEmpIdPrefix(role);
+  const regex = new RegExp(`^${escapeRegex(prefix)}(\\d+)$`);
+  const users = await model.find(
+    { emp_id: { $regex: `^${escapeRegex(prefix)}\\d+$` } },
+    { emp_id: 1 }
+  ).lean();
+
+  let maxSeq = 0;
+  for (const user of users) {
+    const match = user.emp_id?.match(regex);
+    if (!match) continue;
+    const seq = Number.parseInt(match[1], 10);
+    if (Number.isFinite(seq) && seq > maxSeq) {
+      maxSeq = seq;
+    }
+  }
+
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+}
+
 const userSchema = new mongoose.Schema({
   emp_id: {
     type: String,
@@ -88,6 +125,36 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  }
+});
+
+// Auto-generate role-wise employee IDs when not supplied.
+userSchema.pre('validate', async function (next) {
+  try {
+    if (this.emp_id && this.emp_id.trim()) {
+      this.emp_id = this.emp_id.trim().toUpperCase();
+      return next();
+    }
+
+    if (!this.isNew) {
+      return next();
+    }
+
+    const maxAttempts = 5;
+    let attempt = 0;
+    while (attempt < maxAttempts) {
+      const candidateId = await generateNextEmpId(this.constructor, this.role);
+      const exists = await this.constructor.exists({ emp_id: candidateId });
+      if (!exists) {
+        this.emp_id = candidateId;
+        return next();
+      }
+      attempt += 1;
+    }
+
+    return next(new Error('Unable to generate unique employee ID. Please retry.'));
+  } catch (error) {
+    return next(error);
   }
 });
 

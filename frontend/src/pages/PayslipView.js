@@ -13,7 +13,7 @@ const PayslipView = () => {
 
   useEffect(() => {
     fetchPayslip();
-  }, [salaryId]);
+  }, [salaryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchPayslip = async () => {
     try {
@@ -47,7 +47,7 @@ const PayslipView = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-dark-text-secondary">Loading...</div>
+        <div className="text-text-secondary">Loading...</div>
       </div>
     );
   }
@@ -55,10 +55,10 @@ const PayslipView = () => {
   if (!salary) {
     return (
       <div className="max-w-4xl mx-auto">
-        <p className="text-dark-text-secondary mb-4">Payslip not found</p>
+        <p className="text-text-secondary mb-4">Payslip not found</p>
         <button
           onClick={() => navigate('/salary')}
-          className="px-6 py-3 bg-blue-500 text-white border-none rounded-md cursor-pointer font-semibold transition-colors hover:bg-blue-600"
+          className="btn-primary"
         >
           Back to Salary
         </button>
@@ -67,76 +67,76 @@ const PayslipView = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto pb-8">
       <div className="flex justify-between items-center mb-8">
         <button
-          className="px-6 py-3 bg-dark-bg-secondary text-dark-text-primary border border-dark-border rounded-md cursor-pointer font-semibold transition-colors hover:bg-dark-bg-tertiary"
+          className="btn-secondary"
           onClick={() => navigate('/salary')}
         >
           ← Back
         </button>
         {salary.payslip_pdf && (
           <button
-            className="px-6 py-3 bg-green-500 text-white border-none rounded-md cursor-pointer font-semibold transition-colors hover:bg-green-600"
+            className="btn-sm-success px-5 py-3"
             onClick={handleDownload}
           >
             Download PDF
           </button>
         )}
       </div>
-      <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-12">
-        <h1 className="text-center text-blue-500 text-4xl font-bold mb-8">PAYSLIP</h1>
-        <div className="flex justify-between mb-8 pb-4 border-b-2 border-dark-border">
+      <div className="panel p-8 md:p-12">
+        <h1 className="text-center text-primary-600 text-4xl font-bold mb-8">PAYSLIP</h1>
+        <div className="flex justify-between mb-8 pb-4 border-b-2 border-border-light">
           <div>
-            <p className="text-dark-text-secondary mb-2"><strong className="text-dark-text-primary">Month:</strong> {salary.month}</p>
-            <p className="text-dark-text-secondary"><strong className="text-dark-text-primary">Year:</strong> {salary.year}</p>
+            <p className="text-text-secondary mb-2"><strong className="text-text-primary">Month:</strong> {salary.month}</p>
+            <p className="text-text-secondary"><strong className="text-text-primary">Year:</strong> {salary.year}</p>
           </div>
         </div>
         <div className="mb-8">
-          <h2 className="text-dark-text-primary text-xl font-semibold mb-4 pb-2 border-b border-dark-border">Earnings</h2>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <h2 className="text-text-primary text-xl font-semibold mb-4 pb-2 border-b border-border-light">Earnings</h2>
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>Basic Salary</span>
             <span>₹{salary.basic.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>HRA</span>
             <span>₹{salary.hra.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>DA</span>
             <span>₹{salary.da.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>Allowances</span>
             <span>₹{salary.allowances.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-4 mt-2 pt-4 border-t border-dark-border font-semibold text-dark-text-primary">
+          <div className="flex justify-between py-4 mt-2 pt-4 border-t border-border-light font-semibold text-text-primary">
             <span>Gross Salary</span>
             <span>₹{salary.gross_salary.toLocaleString()}</span>
           </div>
         </div>
         <div className="mb-8">
-          <h2 className="text-dark-text-primary text-xl font-semibold mb-4 pb-2 border-b border-dark-border">Deductions</h2>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <h2 className="text-text-primary text-xl font-semibold mb-4 pb-2 border-b border-border-light">Deductions</h2>
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>PF</span>
             <span>₹{salary.pf.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>Tax</span>
             <span>₹{salary.tax.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-3 text-dark-text-secondary">
+          <div className="flex justify-between py-3 text-text-secondary">
             <span>Other Deductions</span>
             <span>₹{salary.deductions.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between py-4 mt-2 pt-4 border-t border-dark-border font-semibold text-dark-text-primary">
+          <div className="flex justify-between py-4 mt-2 pt-4 border-t border-border-light font-semibold text-text-primary">
             <span>Total Deductions</span>
             <span>₹{(salary.pf + salary.tax + salary.deductions).toLocaleString()}</span>
           </div>
         </div>
-        <div className="bg-dark-bg-tertiary p-8 rounded-lg text-center">
-          <h2 className="text-dark-text-primary text-xl font-semibold mb-4">Net Salary</h2>
-          <p className="text-5xl font-bold text-green-500">₹{salary.net_salary.toLocaleString()}</p>
+        <div className="bg-surface-tertiary p-8 rounded-xl text-center border border-border-light">
+          <h2 className="text-text-primary text-xl font-semibold mb-4">Net Salary</h2>
+          <p className="text-5xl font-bold text-emerald-600">₹{salary.net_salary.toLocaleString()}</p>
         </div>
       </div>
     </div>

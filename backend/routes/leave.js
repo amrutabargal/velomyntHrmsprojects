@@ -92,18 +92,24 @@ router.post('/', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     let query = {};
+    const { scope = 'default' } = req.query;
 
-    // Employee can only see own records
-    if (req.user.role === 'employee') {
+    if (scope === 'all') {
+      // Explicit all scope for shared calendar view
+    } else if (scope === 'self') {
       query.user = req.user.id;
-    }
-    // Manager can see team records
-    else if (req.user.role === 'manager') {
+    } else if (scope === 'team' && req.user.role === 'manager') {
       const teamMembers = await User.find({ manager: req.user.id }).select('_id');
-      query.user = { $in: teamMembers.map(u => u._id) };
+      query.user = { $in: teamMembers.map((u) => u._id) };
+    } else {
+      // Default behavior
+      if (req.user.role === 'employee') {
+        query.user = req.user.id;
+      } else if (req.user.role === 'manager') {
+        const teamMembers = await User.find({ manager: req.user.id }).select('_id');
+        query.user = { $in: teamMembers.map((u) => u._id) };
+      }
     }
-    // HR and Admin can see all
-    // query remains empty
 
     const { status, leave_type } = req.query;
     if (status) {

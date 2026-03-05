@@ -33,8 +33,8 @@ const Layout = ({ children }) => {
     { path: '/salary', label: 'Salary & Payslips', icon: <PaymentsIcon /> },
   ];
 
-  // Add Attendance for employees
-  if (user?.role === 'employee') {
+  // Attendance page for all roles except admin
+  if (user && user.role !== 'admin') {
     menuItems.push({ path: '/attendance', label: 'Attendance', icon: <AccessTimeIcon /> });
   }
 

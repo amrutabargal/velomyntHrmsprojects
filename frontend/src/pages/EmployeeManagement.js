@@ -7,7 +7,6 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
-import BadgeIcon from '@mui/icons-material/Badge';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
@@ -22,7 +21,6 @@ const EmployeeManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
-    emp_id: '',
     name: '',
     email: '',
     password: '',
@@ -80,7 +78,6 @@ const EmployeeManagement = () => {
     e.preventDefault();
     try {
       const dataToSend = {
-        emp_id: formData.emp_id,
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -98,7 +95,6 @@ const EmployeeManagement = () => {
       setMessage('Employee registered successfully!');
       setShowModal(false);
       setFormData({
-        emp_id: '',
         name: '',
         email: '',
         password: '',
@@ -265,22 +261,10 @@ const EmployeeManagement = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-text-primary font-medium text-sm flex items-center gap-2">
-                    <BadgeIcon fontSize="small" className="text-text-muted" />
-                    Employee ID *
-                  </label>
-                  <input
-                    type="text"
-                    name="emp_id"
-                    value={formData.emp_id}
-                    onChange={handleChange}
-                    required
-                    placeholder="EMP001"
-                    className="p-3 border border-border-light rounded-xl bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
+              <p className="text-sm text-text-secondary mb-4">
+                Employee ID is auto-generated based on selected role.
+              </p>
+              <div className="grid grid-cols-1 gap-5 mb-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-text-primary font-medium text-sm flex items-center gap-2">
                     <PersonIcon fontSize="small" className="text-text-muted" />

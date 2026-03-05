@@ -31,6 +31,7 @@ app.use('/api/leave', require('./routes/leave'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/time', require('./routes/time'));
+app.use('/api/holidays', require('./routes/holidays'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -38,9 +39,35 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
-const PORT = process.env.PORT || 5000;
+const BASE_PORT = Number(process.env.PORT) || 5000;
+const MAX_PORT_RETRIES = Number(process.env.PORT_RETRY_ATTEMPTS || 10);
+const AUTO_FALLBACK_PORT = process.env.PORT_AUTO_FALLBACK !== 'false';
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = (port, attempt = 0) => {
+  const server = app.listen(port, () => {
+    const fallbackNote = attempt > 0 ? ` (fallback from ${BASE_PORT})` : '';
+    console.log(`Server running on port ${port}${fallbackNote}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      if (!AUTO_FALLBACK_PORT || attempt >= MAX_PORT_RETRIES) {
+        console.error(
+          `Port ${port} is already in use. Stop the existing process or change PORT in backend/.env.`
+        );
+        process.exit(1);
+      }
+
+      const nextPort = port + 1;
+      console.warn(`Port ${port} is in use. Retrying on ${nextPort}...`);
+      startServer(nextPort, attempt + 1);
+      return;
+    }
+
+    console.error('Server startup failed:', err.message);
+    process.exit(1);
+  });
+};
+
+startServer(BASE_PORT);
 

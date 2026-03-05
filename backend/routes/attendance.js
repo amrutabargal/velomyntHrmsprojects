@@ -1,27 +1,49 @@
 const express = require('express');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
-const { auth, authorize } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const router = express.Router();
 
+const TRACKED_ROLES = ['employee', 'manager', 'hr', 'subadmin'];
+const HALF_DAY_HOURS = Number(process.env.ATTENDANCE_HALF_DAY_HOURS || 4.5);
+const LATE_AFTER_HOUR = Number(process.env.ATTENDANCE_LATE_AFTER_HOUR || 10);
+const LATE_AFTER_MINUTE = Number(process.env.ATTENDANCE_LATE_AFTER_MINUTE || 15);
+
+const canTrackAttendance = (role) => TRACKED_ROLES.includes(role);
+
+const getDayBounds = (baseDate = new Date()) => {
+  const dayStart = new Date(baseDate);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  return { dayStart, dayEnd };
+};
+
+const classifyStatus = (punchIn, workHours) => {
+  if (workHours < HALF_DAY_HOURS) return 'half_day';
+  const cutoff = new Date(punchIn);
+  cutoff.setHours(LATE_AFTER_HOUR, LATE_AFTER_MINUTE, 0, 0);
+  if (punchIn > cutoff) return 'late';
+  return 'present';
+};
+
 // @route   POST /api/attendance/punch-in
-// @desc    Employee punch in
-// @access  Private (Employee)
+// @desc    User punch in
+// @access  Private (employee/manager/hr/subadmin)
 router.post('/punch-in', auth, async (req, res) => {
   try {
-    if (req.user.role !== 'employee') {
-      return res.status(403).json({ message: 'Only employees can punch in' });
+    if (!canTrackAttendance(req.user.role)) {
+      return res.status(403).json({ message: 'Your role is not allowed to punch in' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { dayStart, dayEnd } = getDayBounds();
 
     // Check if already punched in today
     const existingAttendance = await Attendance.findOne({
       user: req.user.id,
       date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        $gte: dayStart,
+        $lt: dayEnd
       }
     });
 
@@ -29,11 +51,12 @@ router.post('/punch-in', auth, async (req, res) => {
       return res.status(400).json({ message: 'Already punched in today' });
     }
 
+    const punchInTime = new Date();
     const attendance = new Attendance({
       emp_id: req.user.emp_id,
       user: req.user.id,
-      date: today,
-      punch_in: new Date(),
+      date: dayStart,
+      punch_in: punchInTime,
       status: 'present'
     });
 
@@ -44,6 +67,9 @@ router.post('/punch-in', auth, async (req, res) => {
       attendance: {
         id: attendance._id,
         punch_in: attendance.punch_in,
+        punch_out: attendance.punch_out,
+        work_hours: attendance.work_hours,
+        status: attendance.status,
         date: attendance.date
       }
     });
@@ -53,22 +79,21 @@ router.post('/punch-in', auth, async (req, res) => {
 });
 
 // @route   POST /api/attendance/punch-out
-// @desc    Employee punch out
-// @access  Private (Employee)
+// @desc    User punch out
+// @access  Private (employee/manager/hr/subadmin)
 router.post('/punch-out', auth, async (req, res) => {
   try {
-    if (req.user.role !== 'employee') {
-      return res.status(403).json({ message: 'Only employees can punch out' });
+    if (!canTrackAttendance(req.user.role)) {
+      return res.status(403).json({ message: 'Your role is not allowed to punch out' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { dayStart, dayEnd } = getDayBounds();
 
     const attendance = await Attendance.findOne({
       user: req.user.id,
       date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        $gte: dayStart,
+        $lt: dayEnd
       }
     });
 
@@ -86,6 +111,7 @@ router.post('/punch-out', auth, async (req, res) => {
     // Calculate work hours
     const workHours = (punchOutTime - attendance.punch_in) / (1000 * 60 * 60);
     attendance.work_hours = Math.round(workHours * 100) / 100;
+    attendance.status = classifyStatus(attendance.punch_in, attendance.work_hours);
 
     await attendance.save();
 
@@ -95,7 +121,8 @@ router.post('/punch-out', auth, async (req, res) => {
         id: attendance._id,
         punch_in: attendance.punch_in,
         punch_out: attendance.punch_out,
-        work_hours: attendance.work_hours
+        work_hours: attendance.work_hours,
+        status: attendance.status
       }
     });
   } catch (error) {
@@ -108,14 +135,16 @@ router.post('/punch-out', auth, async (req, res) => {
 // @access  Private
 router.get('/today', auth, async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    if (!canTrackAttendance(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized to view attendance' });
+    }
+    const { dayStart, dayEnd } = getDayBounds();
 
     const attendance = await Attendance.findOne({
       user: req.user.id,
       date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        $gte: dayStart,
+        $lt: dayEnd
       }
     });
 
@@ -130,19 +159,20 @@ router.get('/today', auth, async (req, res) => {
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
+    if (!canTrackAttendance(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized to view attendance records' });
+    }
     let query = {};
 
-    // Employee can only see own records
+    // Employee -> own records, Manager -> team, HR/Subadmin -> all non-admin tracked users
     if (req.user.role === 'employee') {
       query.user = req.user.id;
+    } else if (req.user.role === 'manager') {
+      const teamMembers = await User.find({ manager: req.user.id, role: 'employee' }).select('_id');
+      query.user = { $in: teamMembers.map((u) => u._id) };
+    } else if (req.user.role === 'hr' || req.user.role === 'subadmin') {
+      // No user filter means all attendance in date range (admin page already blocked at frontend)
     }
-    // Manager can see team records
-    else if (req.user.role === 'manager') {
-      const teamMembers = await User.find({ manager: req.user.id }).select('_id');
-      query.user = { $in: teamMembers.map(u => u._id) };
-    }
-    // HR and Admin can see all
-    // query remains empty
 
     const { startDate, endDate } = req.query;
     if (startDate && endDate) {
@@ -175,9 +205,19 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
 
-    // Check access
+    if (!canTrackAttendance(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Access check by role
     if (req.user.role === 'employee' && attendance.user._id.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
+    }
+    if (req.user.role === 'manager') {
+      const employee = await User.findById(attendance.user._id).select('manager');
+      if (!employee || !employee.manager || employee.manager.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
     }
 
     res.json(attendance);

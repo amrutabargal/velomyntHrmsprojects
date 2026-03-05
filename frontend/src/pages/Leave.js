@@ -76,31 +76,37 @@ const Leave = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Leave</h1>
-        <p className="text-muted mt-1">Apply for leave or manage approvals</p>
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Leave Management</h1>
+          <p className="page-subtitle">Apply leave and manage approvals</p>
+        </div>
       </div>
 
-      {message && <div className="p-3 mb-4 bg-green-50 text-green-700 rounded">{message}</div>}
+      {message && (
+        <div className={message.toLowerCase().includes('error') ? 'alert-error' : 'alert-success'}>
+          {message}
+        </div>
+      )}
 
       {/* Apply Leave (employees) */}
       {user?.role === 'employee' && (
-        <form onSubmit={handleApply} className="bg-white p-6 rounded shadow mb-6">
-          <h2 className="text-xl font-semibold mb-4">Apply for Leave</h2>
+        <form onSubmit={handleApply} className="panel panel-body mb-6">
+          <h2 className="panel-title">Apply for Leave</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <select value={form.leave_type} onChange={e => setForm({ ...form, leave_type: e.target.value })} className="p-3 border rounded">
+            <select value={form.leave_type} onChange={e => setForm({ ...form, leave_type: e.target.value })} className="input-field">
               <option value="casual">Casual</option>
               <option value="sick">Sick</option>
               <option value="paid">Paid</option>
               <option value="unpaid">Unpaid</option>
             </select>
-            <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="p-3 border rounded" required />
-            <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="p-3 border rounded" required />
-            <input type="text" placeholder="Reason" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} className="p-3 border rounded" required />
+            <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="input-field" required />
+            <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="input-field" required />
+            <input type="text" placeholder="Reason" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} className="input-field" required />
           </div>
           <div className="mt-4">
-            <button className="px-6 py-2 bg-blue-600 text-white rounded">Apply</button>
+            <button className="btn-primary">Apply</button>
           </div>
         </form>
       )}
@@ -108,31 +114,31 @@ const Leave = () => {
       {/* Dashboard */}
       {dashboard && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="p-4 bg-white rounded shadow">
-            <h3 className="font-semibold">Leave Balance</h3>
-            <ul className="mt-3">
+          <div className="panel panel-body">
+            <h3 className="font-semibold text-text-primary">Leave Balance</h3>
+            <ul className="mt-3 text-text-secondary">
               <li>Casual: {dashboard.balance?.casual ?? 0} days</li>
               <li>Sick: {dashboard.balance?.sick ?? 0} days</li>
               <li>Paid: {dashboard.balance?.paid ?? 0} days</li>
             </ul>
           </div>
-          <div className="p-4 bg-white rounded shadow md:col-span-2">
-            <h3 className="font-semibold">Recent Leaves</h3>
+          <div className="panel panel-body md:col-span-2">
+            <h3 className="font-semibold text-text-primary">Recent Leaves</h3>
             <ul className="mt-3">
               {dashboard.recentLeaves && dashboard.recentLeaves.length ? (
                 dashboard.recentLeaves.map(l => (
-                  <li key={l._id} className="border-b py-2">
+                  <li key={l._id} className="border-b border-border-light py-2">
                     <div className="flex justify-between">
                       <div>
-                        <div className="font-semibold">{l.user?.name || user.name} - {l.leave_type}</div>
-                        <div className="text-sm text-muted">{new Date(l.start_date).toLocaleDateString()} to {new Date(l.end_date).toLocaleDateString()}</div>
+                        <div className="font-semibold text-text-primary">{l.user?.name || user.name} - {l.leave_type}</div>
+                        <div className="text-sm text-text-secondary">{new Date(l.start_date).toLocaleDateString()} to {new Date(l.end_date).toLocaleDateString()}</div>
                       </div>
-                      <div className="text-sm">{l.status.toUpperCase()}</div>
+                      <div className="text-sm text-text-secondary">{l.status.toUpperCase()}</div>
                     </div>
                   </li>
                 ))
               ) : (
-                <li className="text-sm text-muted">No recent leaves</li>
+                <li className="text-sm text-text-secondary">No recent leaves</li>
               )}
             </ul>
           </div>
@@ -141,36 +147,38 @@ const Leave = () => {
 
       {/* Pending approvals for managers/hr/admin/subadmin */}
       {['manager','hr','admin','subadmin'].includes(user?.role) && (
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-semibold mb-4">Pending Leave Approvals ({pending.length})</h2>
+        <div className="panel panel-body">
+          <h2 className="panel-title">Pending Leave Approvals ({pending.length})</h2>
           {pending.length === 0 ? (
-            <div className="text-sm text-muted">No pending leaves</div>
+            <div className="text-sm text-text-secondary">No pending leaves</div>
           ) : (
-            <table className="w-full text-left">
-              <thead>
+            <div className="table-shell">
+              <table className="table-base">
+                <thead className="table-head">
                 <tr>
-                  <th className="p-2">Employee</th>
-                  <th className="p-2">Dates</th>
-                  <th className="p-2">Type</th>
-                  <th className="p-2">Reason</th>
-                  <th className="p-2">Actions</th>
+                  <th className="table-head-cell">Employee</th>
+                  <th className="table-head-cell">Dates</th>
+                  <th className="table-head-cell">Type</th>
+                  <th className="table-head-cell">Reason</th>
+                  <th className="table-head-cell">Actions</th>
                 </tr>
-              </thead>
-              <tbody>
+                </thead>
+                <tbody>
                 {pending.map(l => (
-                  <tr key={l._id} className="border-t">
-                    <td className="p-2">{l.user?.name} ({l.user?.emp_id})</td>
-                    <td className="p-2">{new Date(l.start_date).toLocaleDateString()} - {new Date(l.end_date).toLocaleDateString()}</td>
-                    <td className="p-2">{l.leave_type}</td>
-                    <td className="p-2">{l.reason}</td>
-                    <td className="p-2">
-                      <button className="mr-2 px-3 py-1 bg-green-600 text-white rounded" onClick={() => handleApprove(l._id)}>Approve</button>
-                      <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={() => handleReject(l._id)}>Reject</button>
+                  <tr key={l._id} className="table-row">
+                    <td className="table-cell">{l.user?.name} ({l.user?.emp_id})</td>
+                    <td className="table-cell">{new Date(l.start_date).toLocaleDateString()} - {new Date(l.end_date).toLocaleDateString()}</td>
+                    <td className="table-cell">{l.leave_type}</td>
+                    <td className="table-cell">{l.reason}</td>
+                    <td className="table-cell">
+                      <button className="btn-sm-success mr-2" onClick={() => handleApprove(l._id)}>Approve</button>
+                      <button className="btn-sm-danger" onClick={() => handleReject(l._id)}>Reject</button>
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

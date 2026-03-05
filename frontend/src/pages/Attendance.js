@@ -8,14 +8,17 @@ const Attendance = () => {
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState('');
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const canUsePunch = ['employee', 'manager', 'hr', 'subadmin'].includes(user?.role);
+  const isReviewer = ['manager', 'hr', 'subadmin'].includes(user?.role);
 
   useEffect(() => {
     fetchTodayAttendance();
     fetchAttendanceHistory();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTodayAttendance = async () => {
     try {
@@ -47,158 +50,210 @@ const Attendance = () => {
   };
 
   const handlePunchIn = async () => {
+    if (actionLoading) return;
     try {
+      setActionLoading(true);
       const response = await axios.post(`${API_URL}/attendance/punch-in`);
       setMessage('Punched in successfully!');
       setTodayAttendance(response.data.attendance);
+      await fetchTodayAttendance();
+      await fetchAttendanceHistory();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Error punching in');
       setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handlePunchOut = async () => {
+    if (actionLoading) return;
     try {
+      setActionLoading(true);
       const response = await axios.post(`${API_URL}/attendance/punch-out`);
       setMessage('Punched out successfully!');
       setTodayAttendance(response.data.attendance);
-      fetchAttendanceHistory();
+      await fetchTodayAttendance();
+      await fetchAttendanceHistory();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Error punching out');
       setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-dark-text-secondary">Loading...</div>
+        <div className="text-text-secondary">Loading...</div>
       </div>
     );
   }
 
-  const canPunchIn = !todayAttendance || !todayAttendance.punch_in;
-  const canPunchOut = todayAttendance && todayAttendance.punch_in && !todayAttendance.punch_out;
+  const canPunchIn = canUsePunch && (!todayAttendance || !todayAttendance.punch_in);
+  const canPunchOut = canUsePunch && todayAttendance && todayAttendance.punch_in && !todayAttendance.punch_out;
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-dark-text-primary text-3xl font-bold">Attendance</h1>
-        <p className="text-dark-text-secondary mt-2">Punch in/out and view your attendance records</p>
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Attendance</h1>
+          <p className="page-subtitle">Punch in/out and view attendance records</p>
+        </div>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-md mb-4 text-center ${
+        <div className={`p-4 rounded-xl mb-4 text-center ${
           message.includes('Error')
-            ? 'bg-red-500/10 border border-red-500 text-red-500'
-            : 'bg-green-500/10 border border-green-500 text-green-500'
+            ? 'alert-error'
+            : 'alert-success'
         }`}>
           {message}
         </div>
       )}
 
       {/* Punch In/Out Section */}
-      {user?.role === 'employee' && (
-        <div className="bg-dark-bg-secondary border border-dark-border rounded-xl p-8 mb-8">
-          <h2 className="text-dark-text-primary text-2xl font-bold mb-6">Today's Attendance</h2>
+      {canUsePunch && (
+        <div className="panel mb-8">
+          <div className="panel-body">
+            <h2 className="panel-title">Today's Attendance</h2>
           
-          {todayAttendance ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-dark-bg-tertiary p-6 rounded-lg">
-                <p className="text-dark-text-secondary text-sm mb-2">Punch In</p>
-                <p className="text-dark-text-primary text-xl font-semibold">
-                  {new Date(todayAttendance.punch_in).toLocaleTimeString()}
-                </p>
+            {todayAttendance ? (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-surface-tertiary p-4 rounded-xl">
+                  <p className="text-text-secondary text-sm mb-1">Punch In</p>
+                  <p className="text-text-primary text-lg font-semibold">
+                    {todayAttendance.punch_in ? new Date(todayAttendance.punch_in).toLocaleTimeString() : '-'}
+                  </p>
+                </div>
+                <div className="bg-surface-tertiary p-4 rounded-xl">
+                  <p className="text-text-secondary text-sm mb-1">Punch Out</p>
+                  <p className="text-text-primary text-lg font-semibold">
+                    {todayAttendance.punch_out 
+                      ? new Date(todayAttendance.punch_out).toLocaleTimeString()
+                      : 'Not punched out'}
+                  </p>
+                </div>
+                <div className="bg-surface-tertiary p-4 rounded-xl">
+                  <p className="text-text-secondary text-sm mb-1">Work Hours</p>
+                  <p className="text-text-primary text-lg font-semibold">
+                    {todayAttendance.work_hours !== undefined && todayAttendance.work_hours !== null
+                      ? `${todayAttendance.work_hours} hrs`
+                      : '0 hrs'}
+                  </p>
+                </div>
+                <div className="bg-surface-tertiary p-4 rounded-xl">
+                  <p className="text-text-secondary text-sm mb-1">Status</p>
+                  <p className="text-text-primary text-lg font-semibold">
+                    {todayAttendance.status ? todayAttendance.status.replace('_', ' ').toUpperCase() : 'PRESENT'}
+                  </p>
+                </div>
               </div>
-              <div className="bg-dark-bg-tertiary p-6 rounded-lg">
-                <p className="text-dark-text-secondary text-sm mb-2">Punch Out</p>
-                <p className="text-dark-text-primary text-xl font-semibold">
-                  {todayAttendance.punch_out 
-                    ? new Date(todayAttendance.punch_out).toLocaleTimeString()
-                    : 'Not punched out'}
-                </p>
-              </div>
-              <div className="bg-dark-bg-tertiary p-6 rounded-lg">
-                <p className="text-dark-text-secondary text-sm mb-2">Work Hours</p>
-                <p className="text-dark-text-primary text-xl font-semibold">
-                  {todayAttendance.work_hours ? `${todayAttendance.work_hours} hrs` : '0 hrs'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-dark-text-secondary mb-6">No attendance record for today</p>
-          )}
+            ) : (
+              <p className="text-text-secondary mb-6">No attendance record for today</p>
+            )}
 
-          <div className="flex gap-4">
-            {canPunchIn && (
-              <button
-                onClick={handlePunchIn}
-                className="px-8 py-4 bg-green-500 text-white border-none rounded-md font-semibold cursor-pointer transition-colors hover:bg-green-600 text-lg"
-              >
-                🕐 Punch In
-              </button>
-            )}
-            {canPunchOut && (
-              <button
-                onClick={handlePunchOut}
-                className="px-8 py-4 bg-red-500 text-white border-none rounded-md font-semibold cursor-pointer transition-colors hover:bg-red-600 text-lg"
-              >
-                🕐 Punch Out
-              </button>
-            )}
+            <div className="flex flex-wrap gap-3">
+              {canPunchIn && (
+                <button
+                  onClick={handlePunchIn}
+                  disabled={actionLoading}
+                  className="btn-sm-success px-5 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? 'Processing...' : 'Punch In'}
+                </button>
+              )}
+              {canPunchOut && (
+                <button
+                  onClick={handlePunchOut}
+                  disabled={actionLoading}
+                  className="btn-sm-danger px-5 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {actionLoading ? 'Processing...' : 'Punch Out'}
+                </button>
+              )}
+              {todayAttendance?.punch_in && todayAttendance?.punch_out && (
+                <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-medium">
+                  Attendance completed for today
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Attendance History */}
-      <div className="bg-dark-bg-secondary border border-dark-border rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-dark-border">
-          <h2 className="text-dark-text-primary text-2xl font-bold">Attendance History (Last 30 Days)</h2>
+      <div className="panel overflow-hidden">
+        <div className="p-6 border-b border-border-light">
+          <h2 className="text-xl font-semibold text-text-primary">
+            {isReviewer ? 'Team Attendance (Last 30 Days)' : 'Attendance History (Last 30 Days)'}
+          </h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead className="bg-dark-bg-tertiary">
+        <div className="table-shell">
+          <table className="table-base">
+            <thead className="table-head">
               <tr>
-                <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Date</th>
-                <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Punch In</th>
-                <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Punch Out</th>
-                <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Work Hours</th>
-                <th className="p-4 text-left text-dark-text-primary font-semibold border-b-2 border-dark-border">Status</th>
+                {isReviewer && (
+                  <>
+                    <th className="table-head-cell">Employee</th>
+                    <th className="table-head-cell">Emp ID</th>
+                  </>
+                )}
+                <th className="table-head-cell">Date</th>
+                <th className="table-head-cell">Punch In</th>
+                <th className="table-head-cell">Punch Out</th>
+                <th className="table-head-cell">Work Hours</th>
+                <th className="table-head-cell">Status</th>
               </tr>
             </thead>
             <tbody>
               {attendanceHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-dark-text-secondary">
+                  <td colSpan={isReviewer ? 7 : 5} className="p-8 text-center text-text-secondary">
                     No attendance records found
                   </td>
                 </tr>
               ) : (
                 attendanceHistory.map((record) => (
-                  <tr key={record._id} className="hover:bg-dark-bg-tertiary transition-colors">
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">
+                  <tr key={record._id} className="table-row">
+                    {isReviewer && (
+                      <>
+                        <td className="table-cell">
+                          {record.user?.name || '-'}
+                        </td>
+                        <td className="table-cell">
+                          {record.user?.emp_id || '-'}
+                        </td>
+                      </>
+                    )}
+                    <td className="table-cell">
                       {new Date(record.date).toLocaleDateString()}
                     </td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">
+                    <td className="table-cell">
                       {record.punch_in ? new Date(record.punch_in).toLocaleTimeString() : '-'}
                     </td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">
+                    <td className="table-cell">
                       {record.punch_out ? new Date(record.punch_out).toLocaleTimeString() : '-'}
                     </td>
-                    <td className="p-4 text-dark-text-secondary border-b border-dark-border">
-                      {record.work_hours ? `${record.work_hours} hrs` : '-'}
+                    <td className="table-cell">
+                      {record.work_hours !== undefined && record.work_hours !== null
+                        ? `${record.work_hours} hrs`
+                        : '-'}
                     </td>
-                    <td className="p-4 border-b border-dark-border">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        record.status === 'present' 
-                          ? 'bg-green-500/20 text-green-500'
+                    <td className="table-cell">
+                      <span className={`badge ${
+                        record.status === 'present'
+                          ? 'bg-emerald-100 text-emerald-700'
                           : record.status === 'late'
-                          ? 'bg-yellow-500/20 text-yellow-500'
-                          : 'bg-red-500/20 text-red-500'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : record.status === 'half_day'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-red-100 text-red-700'
                       }`}>
-                        {record.status.toUpperCase()}
+                        {(record.status || 'present').replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
                   </tr>

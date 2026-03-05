@@ -74,7 +74,7 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <PrivateRoute allowedRoles={['employee']}>
+                <PrivateRoute allowedRoles={['employee', 'manager', 'hr', 'subadmin']}>
                   <Attendance />
                 </PrivateRoute>
               }

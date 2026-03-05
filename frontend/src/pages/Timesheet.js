@@ -6,6 +6,8 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const TimesheetPage = () => {
   const { user } = useAuth();
+  const canCreateEntry = ['employee', 'manager', 'hr', 'subadmin', 'admin'].includes(user?.role);
+
   const [entries, setEntries] = useState([]);
   const [pending, setPending] = useState([]);
   const [form, setForm] = useState({ date: '', task_description: '', hours_worked: '', project_name: '' });
@@ -102,103 +104,114 @@ const TimesheetPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Timesheets</h1>
-        <p className="text-muted mt-1">Create, submit and manage timesheet entries</p>
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Timesheets</h1>
+          <p className="page-subtitle">Create, submit and manage entries</p>
+        </div>
       </div>
 
-      {message && <div className="p-3 mb-4 bg-green-50 text-green-700 rounded">{message}</div>}
+      {message && (
+        <div className={message.toLowerCase().includes('error') ? 'alert-error' : 'alert-success'}>
+          {message}
+        </div>
+      )}
 
-      {/* Create entry (employee) */}
-      {user?.role === 'employee' && (
-        <form onSubmit={handleCreate} className="bg-white p-6 rounded shadow mb-6">
+      {/* Create entry (all roles) */}
+      {canCreateEntry && (
+        <form onSubmit={handleCreate} className="panel panel-body mb-6">
+          <h2 className="panel-title">Add Timesheet Entry</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="p-3 border rounded" required />
-            <input type="text" placeholder="Task description" value={form.task_description} onChange={e => setForm({ ...form, task_description: e.target.value })} className="p-3 border rounded" required />
-            <input type="number" step="0.25" placeholder="Hours" value={form.hours_worked} onChange={e => setForm({ ...form, hours_worked: e.target.value })} className="p-3 border rounded" required />
-            <input type="text" placeholder="Project name" value={form.project_name} onChange={e => setForm({ ...form, project_name: e.target.value })} className="p-3 border rounded" />
+            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="input-field" required />
+            <input type="text" placeholder="Task description" value={form.task_description} onChange={e => setForm({ ...form, task_description: e.target.value })} className="input-field" required />
+            <input type="number" step="0.25" placeholder="Hours" value={form.hours_worked} onChange={e => setForm({ ...form, hours_worked: e.target.value })} className="input-field" required />
+            <input type="text" placeholder="Project name" value={form.project_name} onChange={e => setForm({ ...form, project_name: e.target.value })} className="input-field" />
           </div>
           <div className="mt-4">
-            <button className="px-6 py-2 bg-blue-600 text-white rounded">Add Entry</button>
+            <button className="btn-primary">Add Entry</button>
           </div>
         </form>
       )}
 
       {/* My entries */}
-      <div className="bg-white p-6 rounded shadow mb-6">
-        <h2 className="text-xl font-semibold mb-4">My Timesheet Entries</h2>
+      <div className="panel panel-body mb-6">
+        <h2 className="panel-title">My Timesheet Entries</h2>
         {entries.length === 0 ? (
-          <div className="text-sm text-muted">No entries found</div>
+          <div className="text-sm text-text-secondary">No entries found</div>
         ) : (
-          <table className="w-full text-left">
-            <thead>
+          <div className="table-shell">
+            <table className="table-base">
+              <thead className="table-head">
               <tr>
-                <th className="p-2">Date</th>
-                <th className="p-2">Task</th>
-                <th className="p-2">Hours</th>
-                <th className="p-2">Project</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Actions</th>
+                <th className="table-head-cell">Date</th>
+                <th className="table-head-cell">Task</th>
+                <th className="table-head-cell">Hours</th>
+                <th className="table-head-cell">Project</th>
+                <th className="table-head-cell">Status</th>
+                <th className="table-head-cell">Actions</th>
               </tr>
-            </thead>
-            <tbody>
+              </thead>
+              <tbody>
               {entries.map(e => (
-                <tr key={e._id} className="border-t">
-                  <td className="p-2">{new Date(e.date).toLocaleDateString()}</td>
-                  <td className="p-2">{e.task_description}</td>
-                  <td className="p-2">{e.hours_worked}</td>
-                  <td className="p-2">{e.project_name}</td>
-                  <td className="p-2">{e.status}</td>
-                  <td className="p-2">
+                <tr key={e._id} className="table-row">
+                  <td className="table-cell">{new Date(e.date).toLocaleDateString()}</td>
+                  <td className="table-cell">{e.task_description}</td>
+                  <td className="table-cell">{e.hours_worked}</td>
+                  <td className="table-cell">{e.project_name}</td>
+                  <td className="table-cell">{e.status}</td>
+                  <td className="table-cell">
                     {e.status === 'draft' && (
-                      <button className="mr-2 px-3 py-1 bg-yellow-500 text-white rounded" onClick={() => handleSubmit(e._id)}>Submit</button>
+                      <button className="mr-2 px-3 py-1 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 transition-colors" onClick={() => handleSubmit(e._id)}>Submit</button>
                     )}
                     {e.status === 'draft' && (
-                      <button className="mr-2 px-3 py-1 bg-red-500 text-white rounded" onClick={() => handleDelete(e._id)}>Delete</button>
+                      <button className="btn-sm-danger mr-2" onClick={() => handleDelete(e._id)}>Delete</button>
                     )}
                     {e.status === 'submitted' && <span className="text-sm text-blue-600">Pending approval</span>}
                     {e.status === 'approved' && <span className="text-sm text-green-600">Approved</span>}
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* Pending approvals for managers/hr/admin/subadmin */}
       {['manager','hr','admin','subadmin'].includes(user?.role) && (
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-semibold mb-4">Pending Timesheets ({pending.length})</h2>
+        <div className="panel panel-body">
+          <h2 className="panel-title">Pending Timesheets ({pending.length})</h2>
           {pending.length === 0 ? (
-            <div className="text-sm text-muted">No pending timesheets</div>
+            <div className="text-sm text-text-secondary">No pending timesheets</div>
           ) : (
-            <table className="w-full text-left">
-              <thead>
+            <div className="table-shell">
+              <table className="table-base">
+                <thead className="table-head">
                 <tr>
-                  <th className="p-2">Employee</th>
-                  <th className="p-2">Date</th>
-                  <th className="p-2">Task</th>
-                  <th className="p-2">Hours</th>
-                  <th className="p-2">Actions</th>
+                  <th className="table-head-cell">Employee</th>
+                  <th className="table-head-cell">Date</th>
+                  <th className="table-head-cell">Task</th>
+                  <th className="table-head-cell">Hours</th>
+                  <th className="table-head-cell">Actions</th>
                 </tr>
-              </thead>
-              <tbody>
+                </thead>
+                <tbody>
                 {pending.map(t => (
-                  <tr key={t._id} className="border-t">
-                    <td className="p-2">{t.user?.name} ({t.user?.emp_id})</td>
-                    <td className="p-2">{new Date(t.date).toLocaleDateString()}</td>
-                    <td className="p-2">{t.task_description}</td>
-                    <td className="p-2">{t.hours_worked}</td>
-                    <td className="p-2">
-                      <button className="mr-2 px-3 py-1 bg-green-600 text-white rounded" onClick={() => handleApprove(t._id)}>Approve</button>
-                      <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={() => handleReject(t._id)}>Reject</button>
+                  <tr key={t._id} className="table-row">
+                    <td className="table-cell">{t.user?.name} ({t.user?.emp_id})</td>
+                    <td className="table-cell">{new Date(t.date).toLocaleDateString()}</td>
+                    <td className="table-cell">{t.task_description}</td>
+                    <td className="table-cell">{t.hours_worked}</td>
+                    <td className="table-cell">
+                      <button className="btn-sm-success mr-2" onClick={() => handleApprove(t._id)}>Approve</button>
+                      <button className="btn-sm-danger" onClick={() => handleReject(t._id)}>Reject</button>
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
