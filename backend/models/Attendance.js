@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+
 const attendanceSchema = new mongoose.Schema({
   emp_id: {
     type: String,
