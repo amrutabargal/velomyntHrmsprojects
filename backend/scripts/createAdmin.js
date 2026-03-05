@@ -1,31 +1,83 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const User = require('../models/User');
 
 dotenv.config();
+
+const ADMIN_EMAIL = 'amruta442001@gmail.com';
+const ADMIN_PASSWORD = 'Amruta@2001';
+const ADMIN_EMP_ID = 'VM001';
 
 const createAdmin = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    // Check if admin already exists
-    const existingAdmin = await User.findOne({ emp_id: 'ADMIN001' });
-    if (existingAdmin) {
-      console.log('Admin user already exists!');
+    // Step 1: Find user by email (target email)
+    const userByEmail = await User.findOne({ email: ADMIN_EMAIL.toLowerCase() });
+    
+    // Step 2: Find user by admin emp_id (VM001)
+    const userByEmpId = await User.findOne({ emp_id: ADMIN_EMP_ID });
+
+    // Case 1: Same user has both - just update
+    if (userByEmail && userByEmpId && userByEmail._id.toString() === userByEmpId._id.toString()) {
+      userByEmail.role = 'admin';
+      userByEmail.status = 'active';
+      userByEmail.password = ADMIN_PASSWORD;
+      userByEmail.department = userByEmail.department || 'Administration';
+      userByEmail.designation = userByEmail.designation || 'System Administrator';
+      await userByEmail.save();
+      
+      console.log('');
+      console.log('✅ Admin user updated successfully!');
+      showCredentials();
       process.exit(0);
     }
 
-    // Create admin user
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('admin123', salt);
+    // Case 2: User exists with target email (but different emp_id) - update this user to be admin
+    if (userByEmail) {
+      // Delete old VM001 if exists (to avoid emp_id conflict)
+      if (userByEmpId) {
+        await User.deleteOne({ _id: userByEmpId._id });
+        console.log('Old VM001 user removed.');
+      }
+      
+      userByEmail.emp_id = ADMIN_EMP_ID;
+      userByEmail.role = 'admin';
+      userByEmail.status = 'active';
+      userByEmail.password = ADMIN_PASSWORD;
+      userByEmail.department = userByEmail.department || 'Administration';
+      userByEmail.designation = userByEmail.designation || 'System Administrator';
+      await userByEmail.save();
+      
+      console.log('');
+      console.log('✅ Existing user converted to Admin!');
+      showCredentials();
+      process.exit(0);
+    }
 
+    // Case 3: VM001 exists but with different email - update email
+    if (userByEmpId) {
+      userByEmpId.email = ADMIN_EMAIL.toLowerCase();
+      userByEmpId.role = 'admin';
+      userByEmpId.status = 'active';
+      userByEmpId.password = ADMIN_PASSWORD;
+      userByEmpId.department = userByEmpId.department || 'Administration';
+      userByEmpId.designation = userByEmpId.designation || 'System Administrator';
+      await userByEmpId.save();
+      
+      console.log('');
+      console.log('✅ Admin credentials updated!');
+      showCredentials();
+      process.exit(0);
+    }
+
+    // Case 4: No user exists - create new admin
     const admin = new User({
-      emp_id: 'ADMIN001',
+      emp_id: ADMIN_EMP_ID,
       name: 'Admin User',
-      email: 'admin@hrms.com',
-      password: hashedPassword,
+      email: ADMIN_EMAIL.toLowerCase(),
+      password: ADMIN_PASSWORD,
       role: 'admin',
       status: 'active',
       department: 'Administration',
@@ -33,16 +85,23 @@ const createAdmin = async () => {
     });
 
     await admin.save();
-    console.log('Admin user created successfully!');
-    console.log('Email: admin@hrms.com');
-    console.log('Password: admin123');
-    console.log('Please change the password after first login!');
+    console.log('');
+    console.log('✅ Admin user created successfully!');
+    showCredentials();
     process.exit(0);
+
   } catch (error) {
-    console.error('Error creating admin:', error);
+    console.error('❌ Error creating admin:', error.message);
     process.exit(1);
   }
 };
 
-createAdmin();
+function showCredentials() {
+  console.log('-----------------------------------');
+  console.log(`Email: ${ADMIN_EMAIL}`);
+  console.log(`Password: ${ADMIN_PASSWORD}`);
+  console.log('-----------------------------------');
+  console.log('You can now login with these credentials!');
+}
 
+createAdmin();

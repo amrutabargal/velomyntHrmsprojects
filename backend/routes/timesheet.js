@@ -20,13 +20,9 @@ const getWeekDates = (date) => {
 
 // @route   POST /api/timesheet
 // @desc    Create timesheet entry
-// @access  Private (Employee)
+// @access  Private (All logged-in users)
 router.post('/', auth, async (req, res) => {
   try {
-    if (req.user.role !== 'employee') {
-      return res.status(403).json({ message: 'Only employees can create timesheet entries' });
-    }
-
     const { date, task_description, hours_worked, project_name } = req.body;
 
     if (!date || !task_description || !hours_worked) {
@@ -60,7 +56,7 @@ router.post('/', auth, async (req, res) => {
 
 // @route   PUT /api/timesheet/:id
 // @desc    Update timesheet entry
-// @access  Private (Employee - own entries only)
+// @access  Private (Own entries only)
 router.put('/:id', auth, async (req, res) => {
   try {
     const timesheet = await Timesheet.findById(req.params.id);
@@ -70,7 +66,7 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     // Check access
-    if (req.user.role === 'employee' && timesheet.user.toString() !== req.user.id) {
+    if (timesheet.user.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -97,7 +93,7 @@ router.put('/:id', auth, async (req, res) => {
 
 // @route   POST /api/timesheet/:id/submit
 // @desc    Submit timesheet for approval
-// @access  Private (Employee)
+// @access  Private (Own entries)
 router.post('/:id/submit', auth, async (req, res) => {
   try {
     const timesheet = await Timesheet.findById(req.params.id);
@@ -143,8 +139,8 @@ router.post('/:id/submit', auth, async (req, res) => {
 
 // @route   POST /api/timesheet/:id/approve
 // @desc    Approve timesheet
-// @access  Private (Manager/HR/Admin)
-router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const timesheet = await Timesheet.findById(req.params.id)
       .populate('user');
@@ -192,8 +188,8 @@ router.post('/:id/approve', auth, authorize('manager', 'hr', 'admin'), async (re
 
 // @route   POST /api/timesheet/:id/reject
 // @desc    Reject timesheet
-// @access  Private (Manager/HR/Admin)
-router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     const { rejection_reason } = req.body;
 
@@ -246,18 +242,19 @@ router.post('/:id/reject', auth, authorize('manager', 'hr', 'admin'), async (req
 router.get('/', auth, async (req, res) => {
   try {
     let query = {};
+    const { scope = 'self' } = req.query;
 
-    // Employee can only see own records
-    if (req.user.role === 'employee') {
+    if (scope === 'all') {
+      // Explicit all scope for shared calendar view
+    } else if (scope === 'self') {
       query.user = req.user.id;
-    }
-    // Manager can see team records
-    else if (req.user.role === 'manager') {
+    } else if (scope === 'team' && req.user.role === 'manager') {
       const teamMembers = await User.find({ manager: req.user.id }).select('_id');
       query.user = { $in: teamMembers.map(u => u._id) };
+    } else {
+      // Safe fallback
+      query.user = req.user.id;
     }
-    // HR and Admin can see all
-    // query remains empty
 
     const { startDate, endDate, status } = req.query;
     if (startDate && endDate) {
@@ -284,8 +281,8 @@ router.get('/', auth, async (req, res) => {
 
 // @route   GET /api/timesheet/pending
 // @desc    Get pending timesheets for approval
-// @access  Private (Manager/HR/Admin)
-router.get('/pending', auth, authorize('manager', 'hr', 'admin'), async (req, res) => {
+// @access  Private (Manager/HR/Admin/Subadmin)
+router.get('/pending', auth, authorize('manager', 'hr', 'admin', 'subadmin'), async (req, res) => {
   try {
     let query = { status: 'submitted' };
 
@@ -307,7 +304,7 @@ router.get('/pending', auth, authorize('manager', 'hr', 'admin'), async (req, re
 
 // @route   DELETE /api/timesheet/:id
 // @desc    Delete timesheet entry
-// @access  Private (Employee - own entries only, if draft)
+// @access  Private (Own entries only, if draft)
 router.delete('/:id', auth, async (req, res) => {
   try {
     const timesheet = await Timesheet.findById(req.params.id);
@@ -317,7 +314,7 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     // Check access
-    if (req.user.role === 'employee' && timesheet.user.toString() !== req.user.id) {
+    if (timesheet.user.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 

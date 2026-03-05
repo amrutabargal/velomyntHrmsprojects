@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Error fetching user:', error);
       // Only logout if it's an authentication error
       if (error.response?.status === 401 || error.response?.status === 403) {
-        logout();
+        await logout();
       }
     } finally {
       setLoading(false);
@@ -62,11 +62,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-    delete axios.defaults.headers.common['Authorization'];
+  const logout = async () => {
+    // Best-effort server logout so active time session can be stopped.
+    try {
+      if (token) {
+        await axios.post(`${API_URL}/auth/logout`);
+      }
+    } catch (error) {
+      // Ignore logout API failures and continue local cleanup.
+      console.warn('Logout API failed:', error?.response?.data?.message || error.message);
+    } finally {
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+      delete axios.defaults.headers.common['Authorization'];
+    }
   };
 
   const value = {

@@ -1,5 +1,4 @@
-/* Tailwind CSS is now used throughout the application */
+/* Tailwind CSS - Light Theme */
 .App {
-  @apply min-h-screen bg-dark-bg-primary;
+  @apply min-h-screen bg-surface-secondary;
 }
-

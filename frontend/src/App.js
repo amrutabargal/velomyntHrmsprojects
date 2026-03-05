@@ -10,6 +10,10 @@ import SalaryManagement from './pages/SalaryManagement';
 import PayslipView from './pages/PayslipView';
 import PendingApprovals from './pages/PendingApprovals';
 import Attendance from './pages/Attendance';
+import Leave from './pages/Leave';
+import TimeTracker from './pages/TimeTracker';
+import Timesheet from './pages/Timesheet';
+import Calendar from './pages/Calendar';
 import './App.css';
 
 function App() {
@@ -46,7 +50,7 @@ function App() {
             <Route
               path="/salary"
               element={
-                <PrivateRoute>
+                <PrivateRoute allowedRoles={['admin', 'hr', 'subadmin', 'employee']}>
                   <SalaryManagement />
                 </PrivateRoute>
               }
@@ -70,8 +74,40 @@ function App() {
             <Route
               path="/attendance"
               element={
-                <PrivateRoute>
+                <PrivateRoute allowedRoles={['employee', 'manager', 'hr', 'subadmin']}>
                   <Attendance />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/leave"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <Leave />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/time"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <TimeTracker />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/timesheet"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <Timesheet />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <Calendar />
                 </PrivateRoute>
               }
             />
