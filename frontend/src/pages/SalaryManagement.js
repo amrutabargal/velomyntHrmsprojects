@@ -34,15 +34,6 @@ const SalaryManagement = () => {
     final_salary: '',
   });
   const [message, setMessage] = useState('');
-  const [salaryConfig, setSalaryConfig] = useState({
-    basic_ratio: 0.5,
-    hra_ratio: 0.2,
-    da_ratio: 0.1,
-    allowance_ratio: 0.2,
-    pf_rate_on_basic: 0.12,
-    tax_rate_on_gross: 0.05,
-  });
-  const [configSaving, setConfigSaving] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -51,7 +42,6 @@ const SalaryManagement = () => {
       fetchSalaries();
       if (user?.role === 'admin' || user?.role === 'hr' || user?.role === 'subadmin') {
         fetchEmployees();
-        fetchSalaryConfig();
       }
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -70,51 +60,25 @@ const SalaryManagement = () => {
   const fetchEmployees = async () => {
     try {
       const response = await axios.get(`${API_URL}/salary/eligible-users`);
-      setEmployees(response.data);
+      const list = Array.isArray(response.data) ? response.data : [];
+      if (list.length > 0) {
+        setEmployees(list);
+        return;
+      }
+
+      // Fallback for older backend versions
+      const fallback = await axios.get(`${API_URL}/employees`);
+      setEmployees(Array.isArray(fallback.data) ? fallback.data : []);
     } catch (error) {
-      console.error('Error fetching employees:', error);
-    }
-  };
-
-  const fetchSalaryConfig = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/salary/config`);
-      setSalaryConfig(response.data);
-    } catch (error) {
-      console.error('Error fetching salary config:', error);
-    }
-  };
-
-  const handleConfigChange = (e) => {
-    const { name, value } = e.target;
-    setSalaryConfig((prev) => ({
-      ...prev,
-      [name]: value === '' ? '' : Number(value),
-    }));
-  };
-
-  const handleSaveConfig = async () => {
-    const ratioSum =
-      Number(salaryConfig.basic_ratio || 0) +
-      Number(salaryConfig.hra_ratio || 0) +
-      Number(salaryConfig.da_ratio || 0) +
-      Number(salaryConfig.allowance_ratio || 0);
-    if (Math.abs(ratioSum - 1) > 0.0001) {
-      setMessage('Error: Basic/HRA/DA/Allowance ratios sum must be 1.0');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
-    try {
-      setConfigSaving(true);
-      await axios.put(`${API_URL}/salary/config`, salaryConfig);
-      setMessage('Auto salary formula updated successfully!');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      setMessage(error.response?.data?.message || 'Error updating formula');
-      setTimeout(() => setMessage(''), 3000);
-    } finally {
-      setConfigSaving(false);
+      try {
+        // Fallback for older backend versions
+        const fallback = await axios.get(`${API_URL}/employees`);
+        setEmployees(Array.isArray(fallback.data) ? fallback.data : []);
+      } catch (fallbackError) {
+        console.error('Error fetching employees:', fallbackError);
+        setEmployees([]);
+        setMessage('Error loading employee list. Please refresh or restart backend.');
+      }
     }
   };
 
@@ -122,6 +86,24 @@ const SalaryManagement = () => {
     const { name, value } = e.target;
     const numericFields = ['basic', 'hra', 'da', 'pf', 'tax', 'allowances', 'deductions', 'year', 'final_salary'];
     const normalizedValue = numericFields.includes(name) ? (value === '' ? '' : Number(value)) : value;
+
+    if (name === 'final_salary') {
+      const monthly = normalizedValue === '' ? '' : Number(normalizedValue);
+      setFormData({
+        ...formData,
+        final_salary: monthly,
+        // Keep UI clearly in sync for simple mode
+        basic: monthly || 0,
+        hra: 0,
+        da: 0,
+        allowances: 0,
+        pf: 0,
+        tax: 0,
+        deductions: 0,
+      });
+      return;
+    }
+
     setFormData({
       ...formData,
       [name]: normalizedValue,
@@ -186,6 +168,28 @@ const SalaryManagement = () => {
     setShowModal(true);
   };
 
+  const handleUseLastSalary = async () => {
+    if (!formData.emp_id) {
+      setMessage('Please select employee first');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/salary/latest/${formData.emp_id}`);
+      const latest = response.data;
+      setFormData((prev) => ({
+        ...prev,
+        final_salary: latest.net_salary || latest.gross_salary || 0,
+      }));
+      setMessage('Last salary loaded');
+      setTimeout(() => setMessage(''), 2000);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'No previous salary found');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
   const handleGeneratePayslip = async (salaryId) => {
     try {
       await axios.post(`${API_URL}/payslip/generate/${salaryId}`);
@@ -231,30 +235,6 @@ const SalaryManagement = () => {
   };
 
   const isAutoMode = Number(formData.final_salary) > 0;
-  const autoPreview = (() => {
-    const targetNet = Number(formData.final_salary || 0);
-    if (!targetNet) return null;
-
-    const BASIC_RATIO = Number(salaryConfig.basic_ratio || 0.5);
-    const HRA_RATIO = Number(salaryConfig.hra_ratio || 0.2);
-    const DA_RATIO = Number(salaryConfig.da_ratio || 0.1);
-    const ALLOWANCE_RATIO = Number(salaryConfig.allowance_ratio || 0.2);
-    const PF_RATE_ON_BASIC = Number(salaryConfig.pf_rate_on_basic || 0.12);
-    const TAX_RATE_ON_GROSS = Number(salaryConfig.tax_rate_on_gross || 0.05);
-    const fixedDeductions = Number(formData.deductions || 0);
-    const denominator = 1 - TAX_RATE_ON_GROSS - BASIC_RATIO * PF_RATE_ON_BASIC;
-    if (denominator <= 0) return null;
-    const gross = (targetNet + fixedDeductions) / denominator;
-    const basic = gross * BASIC_RATIO;
-    return {
-      basic,
-      hra: gross * HRA_RATIO,
-      da: gross * DA_RATIO,
-      allowances: gross * ALLOWANCE_RATIO,
-      pf: basic * PF_RATE_ON_BASIC,
-      tax: gross * TAX_RATE_ON_GROSS,
-    };
-  })();
 
   if (loading) {
     return (
@@ -299,33 +279,6 @@ const SalaryManagement = () => {
         }`}>
           <CheckCircleIcon />
           {message}
-        </div>
-      )}
-
-      {user?.role === 'admin' && (
-        <div className="mb-6 p-5 bg-primary-50 rounded-xl border border-primary-200">
-          <h3 className="text-primary-800 text-lg font-semibold mb-3">Auto Salary Formula Settings</h3>
-          <p className="text-sm text-primary-700 mb-4">
-            Ratios: basic + hra + da + allowance must equal 1.0
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="basic_ratio" value={salaryConfig.basic_ratio} onChange={handleConfigChange} placeholder="Basic ratio" />
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="hra_ratio" value={salaryConfig.hra_ratio} onChange={handleConfigChange} placeholder="HRA ratio" />
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="da_ratio" value={salaryConfig.da_ratio} onChange={handleConfigChange} placeholder="DA ratio" />
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="allowance_ratio" value={salaryConfig.allowance_ratio} onChange={handleConfigChange} placeholder="Allowance ratio" />
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="pf_rate_on_basic" value={salaryConfig.pf_rate_on_basic} onChange={handleConfigChange} placeholder="PF rate on basic" />
-            <input className="p-2 border border-primary-200 rounded-lg" type="number" step="0.01" min="0" max="1" name="tax_rate_on_gross" value={salaryConfig.tax_rate_on_gross} onChange={handleConfigChange} placeholder="Tax rate on gross" />
-          </div>
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleSaveConfig}
-              disabled={configSaving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-60"
-            >
-              {configSaving ? 'Saving...' : 'Save Formula'}
-            </button>
-          </div>
         </div>
       )}
 
@@ -495,16 +448,27 @@ const SalaryManagement = () => {
                 </div>
               </div>
 
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleUseLastSalary}
+                  className="px-4 py-2 bg-amber-100 text-amber-700 rounded-lg font-medium hover:bg-amber-200 transition-colors"
+                >
+                  Use Last Month Salary
+                </button>
+              </div>
+
               <div className="mb-6 p-5 bg-primary-50 rounded-xl border border-primary-200">
-                <h3 className="text-primary-800 text-lg font-semibold mb-3">Auto Salary From Final Net</h3>
+                <h3 className="text-primary-800 text-lg font-semibold mb-3">Simple Salary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-primary-700 font-medium text-sm">Final Net Salary (One-time)</label>
+                    <label className="text-primary-700 font-medium text-sm">Monthly Salary Amount</label>
                     <input
                       type="number"
                       name="final_salary"
                       value={formData.final_salary}
                       onChange={handleChange}
+                      required
                       min="0"
                       step="0.01"
                       placeholder="e.g. 45000"
@@ -513,10 +477,10 @@ const SalaryManagement = () => {
                   </div>
                   <div className="text-sm text-primary-700">
                     <p className="font-medium">How it works:</p>
-                    <p>If final salary is entered, components auto-calculate using HR ratio and leave deduction.</p>
-                    {autoPreview && (
-                      <p className="mt-2">
-                        Preview Basic: <span className="font-semibold">₹{autoPreview.basic.toFixed(2)}</span>
+                    <p>Enter one salary amount. Same can be reused each month using "Use Last Month Salary".</p>
+                    {isAutoMode && (
+                      <p className="mt-2 font-semibold">
+                        Auto Applied: Basic ₹{Number(formData.basic || 0).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -524,7 +488,7 @@ const SalaryManagement = () => {
               </div>
 
               {/* Earnings Section */}
-              <div className="mb-6 p-5 bg-emerald-50 rounded-xl border border-emerald-200">
+              <div className={`mb-6 p-5 rounded-xl border ${isAutoMode ? 'bg-emerald-50/60 border-emerald-200/70 opacity-70' : 'bg-emerald-50 border-emerald-200'}`}>
                 <h3 className="text-emerald-800 text-lg font-semibold mb-4">Earnings</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="flex flex-col gap-2">
@@ -584,7 +548,7 @@ const SalaryManagement = () => {
               </div>
 
               {/* Deductions Section */}
-              <div className="mb-6 p-5 bg-red-50 rounded-xl border border-red-200">
+              <div className={`mb-6 p-5 rounded-xl border ${isAutoMode ? 'bg-red-50/60 border-red-200/70 opacity-70' : 'bg-red-50 border-red-200'}`}>
                 <h3 className="text-red-800 text-lg font-semibold mb-4">Deductions</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-2">

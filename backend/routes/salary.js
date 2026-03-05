@@ -101,6 +101,22 @@ const deriveFromFinalSalary = ({ finalSalary, manualDeductions = 0, leaveDeducti
   };
 };
 
+const deriveSimpleFromFinalSalary = ({ finalSalary }) => {
+  const net = clamp(toNumber(finalSalary, 0), 0);
+  return {
+    basic: net,
+    hra: 0,
+    da: 0,
+    allowances: 0,
+    pf: 0,
+    tax: 0,
+    deductions: 0,
+    leave_deduction: 0,
+    gross_salary: net,
+    net_salary: net,
+  };
+};
+
 // @route   GET /api/salary/config
 // @desc    Get auto-calculation salary config
 // @access  Private (Admin/HR/Subadmin)
@@ -160,8 +176,6 @@ router.put('/config', auth, authorize('admin'), async (req, res) => {
 // @access  Private (Admin/HR/Subadmin)
 router.post('/', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) => {
   try {
-    const salaryConfig = await getSalaryConfig();
-
     const {
       emp_id,
       month,
@@ -197,27 +211,24 @@ router.post('/', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) =>
     };
 
     if (useFinalSalaryAuto) {
-      // First pass without leave impact, then recompute leave using derived basic and finalize
-      const firstPass = deriveFromFinalSalary({
-        finalSalary: toNumber(final_salary, 0),
-        manualDeductions: toNumber(deductions, 0),
-        leaveDeduction: 0,
-        config: salaryConfig,
-      });
-
-      leave_deduction = await calculateLeaveDeduction(emp_id, month, year, firstPass.basic);
-      salaryParts = deriveFromFinalSalary({
-        finalSalary: toNumber(final_salary, 0),
-        manualDeductions: toNumber(deductions, 0),
-        leaveDeduction: leave_deduction,
-        config: salaryConfig,
-      });
+      // Simplified mode: final salary is directly monthly net salary.
+      const simple = deriveSimpleFromFinalSalary({ finalSalary: toNumber(final_salary, 0) });
+      salaryParts = {
+        basic: simple.basic,
+        hra: simple.hra,
+        da: simple.da,
+        pf: simple.pf,
+        tax: simple.tax,
+        allowances: simple.allowances,
+        deductions: simple.deductions,
+      };
+      leave_deduction = simple.leave_deduction;
     }
 
     // Calculate salaries
     const gross_salary = salaryParts.basic + salaryParts.hra + salaryParts.da + salaryParts.allowances;
     const total_deductions = salaryParts.pf + salaryParts.tax + salaryParts.deductions + leave_deduction;
-    const net_salary = gross_salary - total_deductions;
+    const net_salary = useFinalSalaryAuto ? toNumber(final_salary, 0) : gross_salary - total_deductions;
 
     // Check if salary for this month already exists
     const existingSalary = await Salary.findOne({ emp_id, month, year });
@@ -265,7 +276,6 @@ router.get('/eligible-users', auth, authorize('admin', 'hr', 'subadmin'), async 
 
     const users = await User.find({
       role: { $in: roleFilter },
-      status: { $ne: 'pending' },
     })
       .select('name emp_id role department designation email')
       .sort({ name: 1 });
@@ -273,6 +283,21 @@ router.get('/eligible-users', auth, authorize('admin', 'hr', 'subadmin'), async 
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/salary/latest/:empId
+// @desc    Get latest salary record by employee ID
+// @access  Private (Admin/HR/Subadmin)
+router.get('/latest/:empId', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) => {
+  try {
+    const latestSalary = await Salary.findOne({ emp_id: req.params.empId }).sort({ createdAt: -1 });
+    if (!latestSalary) {
+      return res.status(404).json({ message: 'No previous salary found for this employee' });
+    }
+    return res.json(latestSalary);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 });
 
@@ -367,8 +392,6 @@ router.get('/:id', auth, async (req, res) => {
 // @access  Private (Admin/HR/Subadmin)
 router.put('/:id', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) => {
   try {
-    const salaryConfig = await getSalaryConfig();
-
     const {
       basic,
       hra,
@@ -390,16 +413,17 @@ router.put('/:id', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) 
     let leave_deduction = await calculateLeaveDeduction(salary.emp_id, salary.month, salary.year, requestedBasic);
 
     if (useFinalSalaryAuto) {
-      const autoParts = deriveFromFinalSalary({
+      const simple = deriveSimpleFromFinalSalary({
         finalSalary: toNumber(final_salary, salary.net_salary),
-        manualDeductions: deductions !== undefined ? toNumber(deductions) : salary.deductions,
-        leaveDeduction: leave_deduction,
-        config: salaryConfig,
       });
-
-      Object.assign(salary, autoParts);
-      // Recompute leave deduction with derived basic for final accuracy
-      leave_deduction = await calculateLeaveDeduction(salary.emp_id, salary.month, salary.year, salary.basic);
+      salary.basic = simple.basic;
+      salary.hra = simple.hra;
+      salary.da = simple.da;
+      salary.allowances = simple.allowances;
+      salary.pf = simple.pf;
+      salary.tax = simple.tax;
+      salary.deductions = simple.deductions;
+      leave_deduction = simple.leave_deduction;
     } else if (
       basic !== undefined ||
       hra !== undefined ||
@@ -420,7 +444,9 @@ router.put('/:id', auth, authorize('admin', 'hr', 'subadmin'), async (req, res) 
 
     salary.leave_deduction = leave_deduction;
     salary.gross_salary = salary.basic + salary.hra + salary.da + salary.allowances;
-    salary.net_salary = salary.gross_salary - salary.pf - salary.tax - salary.deductions - salary.leave_deduction;
+    salary.net_salary = useFinalSalaryAuto
+      ? toNumber(final_salary, salary.net_salary)
+      : salary.gross_salary - salary.pf - salary.tax - salary.deductions - salary.leave_deduction;
 
     // Update additional allowed fields only
     if (req.body.status) {
