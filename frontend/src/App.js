@@ -14,6 +14,7 @@ import Leave from './pages/Leave';
 import TimeTracker from './pages/TimeTracker';
 import Timesheet from './pages/Timesheet';
 import Calendar from './pages/Calendar';
+import Notifications from './pages/Notifications';
 import './App.css';
 
 function App() {
@@ -108,6 +109,22 @@ function App() {
               element={
                 <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
                   <Calendar />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <Notifications />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/notifications/:notificationId"
+              element={
+                <PrivateRoute allowedRoles={["employee","manager","hr","admin","subadmin"]}>
+                  <Notifications />
                 </PrivateRoute>
               }
             />

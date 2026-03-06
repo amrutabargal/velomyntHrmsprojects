@@ -28,6 +28,7 @@ const Login = () => {
     role: 'employee',
     department: '',
     designation: '',
+    date_of_birth: '',
     bank_details: {
       account_number: '',
       bank_name: '',
@@ -108,6 +109,7 @@ const Login = () => {
         role: registerData.role,
         department: registerData.department,
         designation: registerData.designation,
+        date_of_birth: registerData.date_of_birth || null,
         bank_details: {
           account_number: registerData.bank_details.account_number || '',
           bank_name: registerData.bank_details.bank_name || '',
@@ -126,6 +128,7 @@ const Login = () => {
         role: 'employee',
         department: '',
         designation: '',
+        date_of_birth: '',
         bank_details: {
           account_number: '',
           bank_name: '',
@@ -252,6 +255,18 @@ const Login = () => {
                     onChange={handleRegisterChange}
                     placeholder="Software Developer"
                     className={inputClass}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Date of Birth</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={registerData.date_of_birth}
+                    onChange={handleRegisterChange}
+                    className="w-full p-4 bg-surface-primary border border-border-light rounded-xl text-text-primary text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                   />
                 </div>
               </div>

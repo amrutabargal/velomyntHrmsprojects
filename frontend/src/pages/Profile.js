@@ -29,6 +29,7 @@ const Profile = () => {
     email: '',
     department: '',
     designation: '',
+    date_of_birth: '',
     bank_details: {
       account_number: '',
       bank_name: '',
@@ -50,6 +51,7 @@ const Profile = () => {
         email: user.email || '',
         department: user.department || '',
         designation: user.designation || '',
+        date_of_birth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().split('T')[0] : '',
         bank_details: {
           account_number: user.bank_details?.account_number || '',
           bank_name: user.bank_details?.bank_name || '',
@@ -72,6 +74,7 @@ const Profile = () => {
         email: response.data.email || '',
         department: response.data.department || '',
         designation: response.data.designation || '',
+        date_of_birth: response.data.date_of_birth ? new Date(response.data.date_of_birth).toISOString().split('T')[0] : '',
         bank_details: {
           account_number: response.data.bank_details?.account_number || '',
           bank_name: response.data.bank_details?.bank_name || '',
@@ -87,6 +90,7 @@ const Profile = () => {
           email: user.email || '',
           department: user.department || '',
           designation: user.designation || '',
+          date_of_birth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().split('T')[0] : '',
           bank_details: {
             account_number: user.bank_details?.account_number || '',
             bank_name: user.bank_details?.bank_name || '',
@@ -135,6 +139,7 @@ const Profile = () => {
         email: formData.email,
         department: formData.department || '',
         designation: formData.designation || '',
+        date_of_birth: formData.date_of_birth || null,
         bank_details: {
           account_number: formData.bank_details.account_number || '',
           bank_name: formData.bank_details.bank_name || '',
@@ -402,6 +407,24 @@ const Profile = () => {
                   value={displayData?.createdAt ? new Date(displayData.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
                   disabled
                   className="p-4 border border-border-light rounded-xl bg-surface-tertiary text-text-primary cursor-not-allowed"
+                />
+              </div>
+              {/* Date of Birth */}
+              <div className="flex flex-col gap-2">
+                <label className="text-text-secondary text-sm font-medium">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="date_of_birth"
+                  value={formData.date_of_birth}
+                  onChange={handleChange}
+                  disabled={!editing}
+                  className={`p-4 border rounded-xl bg-surface-primary text-text-primary transition-all ${
+                    editing
+                      ? 'border-emerald-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100'
+                      : 'border-border-light'
+                  }`}
                 />
               </div>
               {/* Status */}

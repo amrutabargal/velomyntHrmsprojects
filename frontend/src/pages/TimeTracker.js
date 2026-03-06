@@ -79,7 +79,6 @@ const TimeTracker = () => {
       <div className="page-header">
         <div>
           <h1 className="page-title">Time Tracker</h1>
-          <p className="page-subtitle">Track work sessions with live timer and daily summary</p>
         </div>
       </div>
 

@@ -108,6 +108,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  date_of_birth: {
+    type: Date,
+    default: null
+  },
   bank_details: {
     account_number: {
       type: String,

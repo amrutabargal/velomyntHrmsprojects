@@ -106,6 +106,9 @@ router.put('/:id', auth, async (req, res) => {
     if (updateData.name) updateData.name = updateData.name.trim();
     if (updateData.department) updateData.department = updateData.department.trim();
     if (updateData.designation) updateData.designation = updateData.designation.trim();
+    if (updateData.date_of_birth) {
+      updateData.date_of_birth = new Date(updateData.date_of_birth);
+    }
     
     // Ensure bank_details is properly structured
     if (updateData.bank_details) {

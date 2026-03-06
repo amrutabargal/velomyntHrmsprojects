@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 // Material Icons
@@ -9,6 +10,7 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -19,6 +21,41 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const API_URL =
+    typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:5001/api'
+      : process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUnreadCount = async () => {
+      try {
+        if (!user) {
+          if (isMounted) setUnreadCount(0);
+          return;
+        }
+        const res = await axios.get(`${API_URL}/notifications/unread-count`);
+        if (isMounted) {
+          setUnreadCount(Number(res.data?.count || 0));
+        }
+      } catch (_error) {
+        if (isMounted) setUnreadCount(0);
+      }
+    };
+
+    fetchUnreadCount();
+    const intervalId = setInterval(fetchUnreadCount, 30000);
+    const handleNotificationRefresh = () => fetchUnreadCount();
+    window.addEventListener('notifications:updated', handleNotificationRefresh);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener('notifications:updated', handleNotificationRefresh);
+    };
+  }, [API_URL, user]);
 
   const handleLogout = async () => {
     await logout();
@@ -56,6 +93,12 @@ const Layout = ({ children }) => {
   // Calendar for all users
   if (user) {
     menuItems.push({ path: '/calendar', label: 'Calendar', icon: <AccessTimeIcon /> });
+    menuItems.push({
+      path: '/notifications',
+      label: 'Notifications',
+      icon: <NotificationsIcon />,
+      badge: unreadCount > 0 ? unreadCount : null,
+    });
   }
 
   // Add management menus
@@ -112,6 +155,17 @@ const Layout = ({ children }) => {
                   {item.icon}
                 </span>
                 {sidebarOpen && <span>{item.label}</span>}
+                {!!item.badge && (
+                  <span
+                    className={`ml-auto min-w-[22px] h-[22px] px-1 rounded-full text-[11px] font-semibold flex items-center justify-center ${
+                      isActive(item.path)
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </Link>
             </li>
           ))}

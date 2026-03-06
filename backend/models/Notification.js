@@ -8,7 +8,17 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['leave_approved', 'leave_rejected', 'timesheet_pending', 'payroll_generated', 'attendance_alert', 'system_alert'],
+    enum: [
+      'leave_approved',
+      'leave_rejected',
+      'timesheet_pending',
+      'payroll_generated',
+      'attendance_alert',
+      'system_alert',
+      'company_announcement',
+      'leave_announcement',
+      'birthday_wish'
+    ],
     required: true
   },
   title: {
@@ -39,6 +49,10 @@ const notificationSchema = new mongoose.Schema({
   created_at: {
     type: Date,
     default: Date.now
+  },
+  dedupe_key: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
@@ -47,6 +61,7 @@ const notificationSchema = new mongoose.Schema({
 // Index for efficient queries
 notificationSchema.index({ user: 1, is_read: 1 });
 notificationSchema.index({ user: 1, created_at: -1 });
+notificationSchema.index({ dedupe_key: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);
 

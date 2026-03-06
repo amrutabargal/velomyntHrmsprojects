@@ -1,6 +1,7 @@
 const express = require('express');
 const Notification = require('../models/Notification');
-const { auth } = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
+const { ensureBirthdayNotificationsForToday, broadcastNotification } = require('../utils/notificationService');
 const router = express.Router();
 
 // @route   GET /api/notifications
@@ -8,6 +9,7 @@ const router = express.Router();
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
+    await ensureBirthdayNotificationsForToday();
     const { unread_only } = req.query;
     let query = { user: req.user.id };
 
@@ -30,6 +32,7 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.get('/unread-count', auth, async (req, res) => {
   try {
+    await ensureBirthdayNotificationsForToday();
     const count = await Notification.countDocuments({
       user: req.user.id,
       is_read: false
@@ -38,6 +41,52 @@ router.get('/unread-count', auth, async (req, res) => {
     res.json({ count });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Error fetching unread count' });
+  }
+});
+
+// @route   POST /api/notifications/broadcast
+// @desc    Broadcast company/leave notifications
+// @access  Private (Admin/Subadmin)
+router.post('/broadcast', auth, authorize('admin', 'subadmin'), async (req, res) => {
+  try {
+    const { type = 'company_announcement', title, message, recipient_roles } = req.body;
+    const allowedTypes = ['company_announcement', 'leave_announcement', 'system_alert'];
+    const defaultRecipientRoles = ['admin', 'subadmin', 'hr', 'manager', 'employee'];
+    const allowedRecipientRoles = ['hr', 'manager', 'employee', 'admin', 'subadmin'];
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({ message: 'Invalid notification type' });
+    }
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required' });
+    }
+
+    let recipientRoles = defaultRecipientRoles;
+    if (Array.isArray(recipient_roles) && recipient_roles.length) {
+      const sanitizedRoles = recipient_roles
+        .map((role) => String(role).trim())
+        .filter(Boolean);
+      const hasInvalidRole = sanitizedRoles.some((role) => !allowedRecipientRoles.includes(role));
+      if (hasInvalidRole) {
+        return res.status(400).json({ message: 'Invalid recipient roles' });
+      }
+      recipientRoles = [...new Set(sanitizedRoles)];
+    }
+    if (!recipientRoles.includes('manager')) {
+      recipientRoles.push('manager');
+    }
+
+    const sentCount = await broadcastNotification({
+      senderRole: req.user.role,
+      type,
+      title: String(title).trim(),
+      message: String(message).trim(),
+      recipientRoles,
+      senderId: req.user.id,
+    });
+
+    res.status(201).json({ message: 'Notification broadcasted successfully', sentCount });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Error broadcasting notification' });
   }
 });
 

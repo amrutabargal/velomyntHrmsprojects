@@ -6,6 +6,7 @@ const COMPANY_CONFIG = require('../config/company');
 const { generateNumericOtp, hashOtp, verifyOtp } = require('../utils/adminOtp');
 const { sendMail } = require('../utils/mailer');
 const { adminRegistrationOtpEmail } = require('../utils/emailTemplates');
+const { ensureBirthdayNotificationsForToday } = require('../utils/notificationService');
 const router = express.Router();
 
 // Generate JWT Token
@@ -78,7 +79,7 @@ router.post('/register', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to register users' });
     }
 
-    const { name, email, password, role, department, designation, bank_details } = req.body;
+    const { name, email, password, role, department, designation, date_of_birth, bank_details } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -122,6 +123,7 @@ router.post('/register', auth, async (req, res) => {
       approved_at: approvedAt,
       department: department ? department.trim() : '',
       designation: designation ? designation.trim() : '',
+      date_of_birth: date_of_birth ? new Date(date_of_birth) : null,
       bank_details: bank_details ? {
         account_number: bank_details.account_number ? bank_details.account_number.trim() : '',
         bank_name: bank_details.bank_name ? bank_details.bank_name.trim() : '',
@@ -219,6 +221,13 @@ router.post('/login', async (req, res) => {
       console.warn('TimeSession start failed:', e.message);
     }
 
+    // Ensure daily birthday notifications exist (best-effort)
+    try {
+      await ensureBirthdayNotificationsForToday();
+    } catch (e) {
+      console.warn('Birthday notification generation failed:', e.message);
+    }
+
     res.json({
       token,
       user: {
@@ -261,7 +270,7 @@ router.post('/logout', auth, async (req, res) => {
 // @access  Public
 router.post('/register-public', async (req, res) => {
   try {
-    const { name, email, password, role, department, designation, bank_details } = req.body;
+    const { name, email, password, role, department, designation, date_of_birth, bank_details } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -295,6 +304,7 @@ router.post('/register-public', async (req, res) => {
       status: userStatus,
       department: department ? department.trim() : '',
       designation: designation ? designation.trim() : '',
+      date_of_birth: date_of_birth ? new Date(date_of_birth) : null,
       bank_details: bank_details ? {
         account_number: bank_details.account_number ? bank_details.account_number.trim() : '',
         bank_name: bank_details.bank_name ? bank_details.bank_name.trim() : '',
@@ -479,6 +489,7 @@ router.get('/me', auth, async (req, res) => {
       status: user.status,
       department: user.department,
       designation: user.designation,
+      date_of_birth: user.date_of_birth,
       bank_details: user.bank_details,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt

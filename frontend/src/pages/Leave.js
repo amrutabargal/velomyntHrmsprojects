@@ -80,7 +80,6 @@ const Leave = () => {
       <div className="page-header">
         <div>
           <h1 className="page-title">Leave Management</h1>
-          <p className="page-subtitle">Apply leave and manage approvals</p>
         </div>
       </div>
 

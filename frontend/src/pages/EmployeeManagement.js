@@ -27,6 +27,7 @@ const EmployeeManagement = () => {
     role: 'employee',
     department: '',
     designation: '',
+    date_of_birth: '',
     bank_details: {
       account_number: '',
       bank_name: '',
@@ -84,6 +85,7 @@ const EmployeeManagement = () => {
         role: formData.role,
         department: formData.department,
         designation: formData.designation,
+        date_of_birth: formData.date_of_birth || null,
         bank_details: {
           account_number: formData.bank_details.account_number || '',
           bank_name: formData.bank_details.bank_name || '',
@@ -101,6 +103,7 @@ const EmployeeManagement = () => {
         role: 'employee',
         department: '',
         designation: '',
+        date_of_birth: '',
         bank_details: {
           account_number: '',
           bank_name: '',
@@ -367,6 +370,16 @@ const EmployeeManagement = () => {
                     value={formData.designation}
                     onChange={handleChange}
                     placeholder="Software Developer"
+                    className="p-3 border border-border-light rounded-xl bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-text-primary font-medium text-sm">Date of Birth</label>
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={formData.date_of_birth}
+                    onChange={handleChange}
                     className="p-3 border border-border-light rounded-xl bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>

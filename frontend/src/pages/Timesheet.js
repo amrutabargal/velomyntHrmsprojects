@@ -108,7 +108,6 @@ const TimesheetPage = () => {
       <div className="page-header">
         <div>
           <h1 className="page-title">Timesheets</h1>
-          <p className="page-subtitle">Create, submit and manage entries</p>
         </div>
       </div>
 
