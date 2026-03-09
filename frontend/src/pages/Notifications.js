@@ -25,7 +25,6 @@ const Notifications = () => {
     type: 'company_announcement',
     title: '',
     message: '',
-    recipient_roles: ['admin', 'subadmin', 'hr', 'manager', 'employee'],
   });
   const canBroadcast = ['admin', 'subadmin'].includes(user?.role);
   const isDetailView = Boolean(notificationId);
@@ -114,11 +113,6 @@ const Notifications = () => {
 
   const sendBroadcast = async (e) => {
     e.preventDefault();
-    if (!(compose.recipient_roles || []).length) {
-      setMessage('Please select at least one recipient role');
-      return;
-    }
-
     setSending(true);
     try {
       const cleanedMessage = normalizeMessageContent(compose.message);
@@ -138,7 +132,6 @@ const Notifications = () => {
         type: 'company_announcement',
         title: '',
         message: '',
-        recipient_roles: ['admin', 'subadmin', 'hr', 'manager', 'employee'],
       });
       fetchNotifications();
       refreshSidebarUnread();
@@ -152,13 +145,6 @@ const Notifications = () => {
     } finally {
       setSending(false);
     }
-  };
-
-  const toggleRecipientRole = (role) => {
-    const current = compose.recipient_roles || [];
-    const exists = current.includes(role);
-    const next = exists ? current.filter((r) => r !== role) : [...current, role];
-    setCompose({ ...compose, recipient_roles: next });
   };
 
   const openNotification = async (notification) => {
@@ -301,34 +287,11 @@ const Notifications = () => {
             rows="4"
             value={compose.message}
             onChange={(e) => setCompose({ ...compose, message: e.target.value })}
-            placeholder="Write official message for selected roles"
+            placeholder="Write official message for all users"
             required
           />
           <div className="mt-4">
-            <p className="text-sm text-text-secondary mb-2">Send to roles</p>
-            <div className="flex flex-wrap gap-4">
-              {[
-                { value: 'admin', label: 'Admin' },
-                { value: 'subadmin', label: 'Subadmin' },
-                { value: 'hr', label: 'HR' },
-                { value: 'manager', label: 'Manager' },
-                { value: 'employee', label: 'Employee' },
-              ].map((role) => (
-                <label key={role.value} className="flex items-center gap-2 text-sm text-text-primary">
-                  <input
-                    type="checkbox"
-                    checked={(compose.recipient_roles || []).includes(role.value)}
-                    disabled={role.value === 'manager'}
-                    onChange={() => toggleRecipientRole(role.value)}
-                  />
-                  {role.label}
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-text-muted mt-2">Manager role is mandatory for every notification.</p>
-            {!(compose.recipient_roles || []).length && (
-              <p className="text-xs text-red-500 mt-2">Please select at least one role.</p>
-            )}
+            <p className="text-sm text-text-secondary">This notification will be sent to all active users.</p>
           </div>
           <div className="mt-4 p-4 rounded-xl border border-primary-200 bg-primary-50">
             <p className="text-xs text-text-secondary mb-2 font-semibold">Template Preview</p>
@@ -342,7 +305,7 @@ const Notifications = () => {
             <button
               className="btn-primary"
               type="submit"
-              disabled={!(compose.recipient_roles || []).length || sending}
+              disabled={sending}
             >
               {sending ? 'Sending...' : 'Send Notification'}
             </button>

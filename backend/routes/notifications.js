@@ -49,30 +49,14 @@ router.get('/unread-count', auth, async (req, res) => {
 // @access  Private (Admin/Subadmin)
 router.post('/broadcast', auth, authorize('admin', 'subadmin'), async (req, res) => {
   try {
-    const { type = 'company_announcement', title, message, recipient_roles } = req.body;
+    const { type = 'company_announcement', title, message } = req.body;
     const allowedTypes = ['company_announcement', 'leave_announcement', 'system_alert'];
-    const defaultRecipientRoles = ['admin', 'subadmin', 'hr', 'manager', 'employee'];
-    const allowedRecipientRoles = ['hr', 'manager', 'employee', 'admin', 'subadmin'];
+    const recipientRoles = ['admin', 'subadmin', 'hr', 'manager', 'employee'];
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({ message: 'Invalid notification type' });
     }
     if (!title || !message) {
       return res.status(400).json({ message: 'Title and message are required' });
-    }
-
-    let recipientRoles = defaultRecipientRoles;
-    if (Array.isArray(recipient_roles) && recipient_roles.length) {
-      const sanitizedRoles = recipient_roles
-        .map((role) => String(role).trim())
-        .filter(Boolean);
-      const hasInvalidRole = sanitizedRoles.some((role) => !allowedRecipientRoles.includes(role));
-      if (hasInvalidRole) {
-        return res.status(400).json({ message: 'Invalid recipient roles' });
-      }
-      recipientRoles = [...new Set(sanitizedRoles)];
-    }
-    if (!recipientRoles.includes('manager')) {
-      recipientRoles.push('manager');
     }
 
     const sentCount = await broadcastNotification({
@@ -84,7 +68,7 @@ router.post('/broadcast', auth, authorize('admin', 'subadmin'), async (req, res)
       senderId: req.user.id,
     });
 
-    res.status(201).json({ message: 'Notification broadcasted successfully', sentCount });
+    res.status(201).json({ message: 'Notification broadcasted to all users successfully', sentCount });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Error broadcasting notification' });
   }
